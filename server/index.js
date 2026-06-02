@@ -3,6 +3,9 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { createRoom, pickRandomLetter, pickCategoryList, scoreRound, CATEGORY_LISTS } = require('./gameLogic');
+const { initAI, validateAnswers } = require('./aiValidation');
+
+initAI();
 
 const app = express();
 app.use(cors());
@@ -234,11 +237,47 @@ function startRound(room) {
   }, room.timeLimit * 1000);
 }
 
-function endRound(room) {
+async function endRound(room) {
   if (room._timer) clearTimeout(room._timer);
   room.status = 'reviewing';
 
+  // Notify clients that AI is validating
+  broadcast(room.code, 'ai_validating', {});
+
+  // AI validation (falls back to letter-check if no API key or error)
+  const aiValidation = await validateAnswers(
+    room.currentLetter,
+    room.categories,
+    room.answers,
+    room.players
+  );
+
+  // Apply AI validation: invalidate answers that AI rejected
+  if (aiValidation) {
+    room.players.forEach(player => {
+      room.categories.forEach(cat => {
+        const result = aiValidation[player.id]?.[cat];
+        if (result && !result.valid && room.answers[player.id]?.[cat]) {
+          room.answers[player.id][cat + '__invalid'] = room.answers[player.id][cat];
+          room.answers[player.id][cat] = '';
+        }
+      });
+    });
+  }
+
   const scores = scoreRound(room);
+
+  // Restore original answers for display (mark as invalid)
+  if (aiValidation) {
+    room.players.forEach(player => {
+      room.categories.forEach(cat => {
+        if (room.answers[player.id]?.[cat + '__invalid']) {
+          room.answers[player.id][cat] = room.answers[player.id][cat + '__invalid'];
+          delete room.answers[player.id][cat + '__invalid'];
+        }
+      });
+    });
+  }
 
   broadcast(room.code, 'round_end', {
     answers: room.answers,
@@ -248,6 +287,7 @@ function endRound(room) {
     letter: room.currentLetter,
     listNumber: room.currentListNumber,
     isLastRound: room.round >= room.maxRounds,
+    aiValidation,
   });
   broadcast(room.code, 'room_update', getRoomState(room));
 }

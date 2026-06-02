@@ -10,6 +10,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   const [submitted, setSubmitted] = useState(false);
   const [bastaMessage, setBastaMessage] = useState('');
   const [bastaCountdown, setBastaCountdown] = useState(null);
+  const [aiValidating, setAiValidating] = useState(false);
   const timerRef = useRef(null);
   const answersRef = useRef({});
 
@@ -41,11 +42,12 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
       setBastaMessage(`¡${playerName} llamó BASTA!`);
       setBastaCountdown(5);
     });
+    socket.on('ai_validating', () => setAiValidating(true));
     socket.on('round_end', (data) => {
       clearInterval(timerRef.current);
       onRoundEnd(data);
     });
-    return () => { socket.off('basta_called'); socket.off('round_end'); };
+    return () => { socket.off('basta_called'); socket.off('ai_validating'); socket.off('round_end'); };
   }, [socket]);
 
   useEffect(() => {
@@ -79,6 +81,14 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   const progress = maxTime > 0 ? timeLeft / maxTime : 0;
   const dashOffset = circumference * (1 - progress);
   const timerColor = timeLeft > maxTime * 0.4 ? '#4ade80' : timeLeft > maxTime * 0.2 ? '#facc15' : '#f87171';
+
+  if (aiValidating) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="text-7xl animate-bounce">🤖</div>
+      <p className="font-game text-4xl text-yellow-400">Validando...</p>
+      <p className="text-white/50 text-sm">La IA está revisando cada respuesta</p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col max-w-xl mx-auto w-full px-3 py-4">

@@ -5,7 +5,7 @@ const COLORS = ['bg-yellow-400','bg-gray-300','bg-orange-400','bg-blue-400','bg-
 
 export default function Results({ roundEndData, playerId, isHost, onNextRound, onGameOver }) {
   const { socket } = useSocket();
-  const { answers, roundScores, players, categories, letter, listNumber, isLastRound } = roundEndData;
+  const { answers, roundScores, players, categories, letter, listNumber, isLastRound, aiValidation } = roundEndData;
   const [challenges, setChallenges] = useState({});
   const [activeChallenge, setActiveChallenge] = useState(null);
 
@@ -133,7 +133,8 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
                   </td>
                   {players.map((p) => {
                     const ans = (answers[p.id]?.[cat] || '').trim();
-                    const isValid = ans.toUpperCase().startsWith(letter);
+                    const aiResult = aiValidation?.[p.id]?.[cat];
+                    const isValid = aiResult ? aiResult.valid : ans.toUpperCase().startsWith(letter);
                     const isUnique = isValid && players.filter(pl =>
                       (answers[pl.id]?.[cat] || '').trim().toLowerCase() === ans.toLowerCase()
                     ).length === 1;
@@ -145,6 +146,11 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
                       <td key={p.id} className="py-2 px-1 text-center">
                         {ans ? (
                           <div className="flex flex-col items-center gap-0.5">
+                            {aiResult && (
+                              <span className="text-white/30 text-xs" title={aiResult.reason}>
+                                {aiResult.valid ? '🤖✓' : '🤖✗'}
+                              </span>
+                            )}
                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
                               challenged?.resolved && !challenged?.accepted
                                 ? 'bg-gray-500/30 text-gray-400 line-through'
