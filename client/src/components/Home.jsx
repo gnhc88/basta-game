@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 
 export default function Home({ onEnterGame }) {
@@ -11,11 +11,14 @@ export default function Home({ onEnterGame }) {
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState('');
   const [publicRooms, setPublicRooms] = useState([]);
+  const nameRef = useRef(name);
+
+  useEffect(() => { nameRef.current = name; }, [name]);
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('room_created', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true, name }));
-    socket.on('room_joined', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false, name }));
+    socket.on('room_created', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true, name: nameRef.current }));
+    socket.on('room_joined', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false, name: nameRef.current }));
     socket.on('error', ({ msg }) => setError(msg));
     socket.on('public_rooms', setPublicRooms);
 
