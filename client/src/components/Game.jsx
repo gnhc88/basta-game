@@ -11,6 +11,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   const [bastaMessage, setBastaMessage] = useState('');
   const [bastaCountdown, setBastaCountdown] = useState(null);
   const timerRef = useRef(null);
+  const answersRef = useRef({});
 
   const { letter, categories, round, timerEnd, maxRounds, listNumber } = roundData;
 
@@ -22,7 +23,14 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
     timerRef.current = setInterval(() => {
       const left = Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000));
       setTimeLeft(left);
-      if (left === 0) clearInterval(timerRef.current);
+      if (left === 0) {
+        clearInterval(timerRef.current);
+        // Auto-submit answers when timer runs out
+        setSubmitted(prev => {
+          if (!prev) socket.emit('submit_answers', { answers: answersRef.current });
+          return true;
+        });
+      }
     }, 200);
     return () => clearInterval(timerRef.current);
   }, [timerEnd]);
@@ -48,19 +56,21 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   }, [bastaCountdown]);
 
   const handleChange = (cat, value) => {
-    setAnswers(prev => ({ ...prev, [cat]: value }));
+    const updated = { ...answersRef.current, [cat]: value };
+    answersRef.current = updated;
+    setAnswers(updated);
   };
 
   const handleBasta = () => {
     if (submitted) return;
     setSubmitted(true);
-    socket.emit('call_basta', { answers });
+    socket.emit('call_basta', { answers: answersRef.current });
   };
 
   const handleSubmit = () => {
     if (submitted) return;
     setSubmitted(true);
-    socket.emit('submit_answers', { answers });
+    socket.emit('submit_answers', { answers: answersRef.current });
   };
 
   // Timer ring
