@@ -27,6 +27,19 @@ function broadcast(roomCode, event, data) {
   io.to(roomCode).emit(event, data);
 }
 
+function broadcastPublicRooms() {
+  const publicRooms = Object.values(rooms)
+    .filter(r => r.status === 'lobby' && r.players.length < 8 && r.public)
+    .map(r => ({
+      code: r.code,
+      host: r.players[0]?.name || '?',
+      players: r.players.length,
+      maxRounds: r.maxRounds,
+      timeLimit: r.timeLimit,
+    }));
+  io.emit('public_rooms', publicRooms);
+}
+
 function getRoomState(room) {
   return {
     code: room.code,
@@ -46,10 +59,11 @@ function getRoomState(room) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('create_room', ({ name, maxRounds, timeLimit }) => {
+  socket.on('create_room', ({ name, maxRounds, timeLimit, isPublic }) => {
     const room = createRoom(socket.id, name);
     if (maxRounds) room.maxRounds = maxRounds;
     if (timeLimit) room.timeLimit = timeLimit;
+    room.public = !!isPublic;
 
     rooms[room.code] = room;
     playerRoom[socket.id] = room.code;
@@ -57,6 +71,7 @@ io.on('connection', (socket) => {
     socket.join(room.code);
     socket.emit('room_created', { roomCode: room.code, playerId: socket.id });
     broadcast(room.code, 'room_update', getRoomState(room));
+    broadcastPublicRooms();
   });
 
   socket.on('join_room', ({ name, roomCode }) => {
@@ -71,6 +86,21 @@ io.on('connection', (socket) => {
     socket.join(roomCode);
     socket.emit('room_joined', { roomCode, playerId: socket.id });
     broadcast(roomCode, 'room_update', getRoomState(room));
+    broadcastPublicRooms();
+  });
+
+  // Return list of open public rooms
+  socket.on('get_public_rooms', () => {
+    const publicRooms = Object.values(rooms)
+      .filter(r => r.status === 'lobby' && r.players.length < 8 && r.public)
+      .map(r => ({
+        code: r.code,
+        host: r.players[0]?.name || '?',
+        players: r.players.length,
+        maxRounds: r.maxRounds,
+        timeLimit: r.timeLimit,
+      }));
+    socket.emit('public_rooms', publicRooms);
   });
 
   // Request current room state (e.g., when Lobby mounts after joining)
@@ -200,6 +230,7 @@ io.on('connection', (socket) => {
 
     broadcast(roomCode, 'player_left', { playerId: socket.id });
     broadcast(roomCode, 'room_update', getRoomState(room));
+    broadcastPublicRooms();
   });
 });
 
