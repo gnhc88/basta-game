@@ -1,0 +1,177 @@
+import { useEffect, useState, useRef } from 'react';
+import { useSocket } from '../context/SocketContext';
+
+export default function Game({ roomCode, playerId, isHost, initialRoundData, onRoundEnd }) {
+  const { socket } = useSocket();
+  const [roundData] = useState(initialRoundData);
+  const [answers, setAnswers] = useState({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [maxTime, setMaxTime] = useState(60);
+  const [submitted, setSubmitted] = useState(false);
+  const [bastaMessage, setBastaMessage] = useState('');
+  const [bastaCountdown, setBastaCountdown] = useState(null);
+  const timerRef = useRef(null);
+
+  const { letter, categories, round, timerEnd, maxRounds, listNumber } = roundData;
+
+  useEffect(() => {
+    const total = Math.ceil((timerEnd - Date.now()) / 1000);
+    setMaxTime(total);
+    setTimeLeft(total);
+
+    timerRef.current = setInterval(() => {
+      const left = Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000));
+      setTimeLeft(left);
+      if (left === 0) clearInterval(timerRef.current);
+    }, 200);
+    return () => clearInterval(timerRef.current);
+  }, [timerEnd]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on('basta_called', ({ playerName }) => {
+      setBastaMessage(`¡${playerName} llamó BASTA!`);
+      setBastaCountdown(5);
+    });
+    socket.on('round_end', (data) => {
+      clearInterval(timerRef.current);
+      onRoundEnd(data);
+    });
+    return () => { socket.off('basta_called'); socket.off('round_end'); };
+  }, [socket]);
+
+  useEffect(() => {
+    if (bastaCountdown === null) return;
+    if (bastaCountdown <= 0) { setSubmitted(true); return; }
+    const t = setTimeout(() => setBastaCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [bastaCountdown]);
+
+  const handleChange = (cat, value) => {
+    setAnswers(prev => ({ ...prev, [cat]: value }));
+  };
+
+  const handleBasta = () => {
+    if (submitted) return;
+    setSubmitted(true);
+    socket.emit('call_basta', { answers });
+  };
+
+  const handleSubmit = () => {
+    if (submitted) return;
+    setSubmitted(true);
+    socket.emit('submit_answers', { answers });
+  };
+
+  // Timer ring
+  const radius = 28;
+  const circumference = 2 * Math.PI * radius;
+  const progress = maxTime > 0 ? timeLeft / maxTime : 0;
+  const dashOffset = circumference * (1 - progress);
+  const timerColor = timeLeft > maxTime * 0.4 ? '#4ade80' : timeLeft > maxTime * 0.2 ? '#facc15' : '#f87171';
+
+  return (
+    <div className="min-h-screen flex flex-col max-w-xl mx-auto w-full px-3 py-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 gap-3">
+        {/* Round info */}
+        <div className="card px-4 py-2 text-center">
+          <div className="text-yellow-300 text-xs font-black uppercase tracking-wider">Ronda</div>
+          <div className="font-game text-2xl text-white leading-none">{round}/{maxRounds}</div>
+          {listNumber && <div className="text-white/40 text-xs">Lista {listNumber}</div>}
+        </div>
+
+        {/* Letter - center */}
+        <div className="flex flex-col items-center">
+          <div className="text-yellow-300 text-xs font-black uppercase tracking-widest mb-1">Letra</div>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl"
+            style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)', boxShadow: '0 4px 20px rgba(255,165,0,0.5)' }}>
+            <span className="font-game text-6xl text-gray-900 leading-none">{letter}</span>
+          </div>
+        </div>
+
+        {/* Timer ring */}
+        <div className="card px-4 py-2 flex flex-col items-center">
+          <div className="text-yellow-300 text-xs font-black uppercase tracking-wider mb-1">Tiempo</div>
+          <div className="relative w-16 h-16">
+            <svg width="64" height="64" className="-rotate-90">
+              <circle cx="32" cy="32" r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+              <circle cx="32" cy="32" r={radius} fill="none" stroke={timerColor} strokeWidth="5"
+                strokeDasharray={circumference} strokeDashoffset={dashOffset}
+                strokeLinecap="round" className="timer-ring" />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center font-game text-xl" style={{ color: timerColor }}>
+              {timeLeft}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Basta notification */}
+      {bastaMessage && (
+        <div className="bg-red-900/50 border-2 border-red-400/70 rounded-2xl px-5 py-3 mb-3 text-center">
+          <p className="font-black text-lg text-red-300">{bastaMessage}</p>
+          {bastaCountdown !== null && bastaCountdown > 0 && (
+            <p className="text-white/60 text-sm">Termina tus respuestas · {bastaCountdown}s</p>
+          )}
+        </div>
+      )}
+
+      {/* Answer sheet — mimics the paper block from the real game */}
+      <div className="card flex-1 overflow-hidden mb-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div className="px-4 pt-3 pb-1 border-b border-white/10">
+          <p className="text-center text-white/50 text-xs font-bold uppercase tracking-widest">
+            Escribe con la letra <span className="text-yellow-300 font-black text-sm">{letter}</span>
+          </p>
+        </div>
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+          {categories.map((cat, i) => {
+            const val = answers[cat] || '';
+            const hasInput = val.trim().length > 0;
+            const valid = val.trim().toUpperCase().startsWith(letter);
+
+            return (
+              <div key={cat} className="flex items-center border-b border-white/10 px-3 py-2 gap-2">
+                <span className="text-yellow-400 font-black text-sm w-5 shrink-0 text-right">{i + 1}</span>
+                <span className="text-white/80 text-sm font-semibold w-44 shrink-0 leading-tight">{cat}</span>
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={val}
+                    onChange={e => handleChange(cat, e.target.value)}
+                    disabled={submitted}
+                    placeholder={`${letter}...`}
+                    className={`w-full bg-transparent border-b-2 px-1 py-1 text-white placeholder-white/20 font-bold text-sm focus:outline-none transition
+                      ${submitted ? 'opacity-60' : ''}
+                      ${hasInput
+                        ? valid ? 'border-green-400' : 'border-red-400'
+                        : 'border-white/20 focus:border-yellow-400'}
+                    `}
+                  />
+                  {hasInput && (
+                    <span className={`absolute right-0 top-1/2 -translate-y-1/2 text-sm ${valid ? 'text-green-400' : 'text-red-400'}`}>
+                      {valid ? '✓' : '✗'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button onClick={handleSubmit} disabled={submitted}
+          className="flex-1 py-4 rounded-2xl font-black text-lg transition active:scale-95 disabled:opacity-40"
+          style={{ background: submitted ? 'rgba(255,255,255,0.1)' : 'rgba(100,200,100,0.3)', border: '2px solid rgba(100,200,100,0.5)', color: 'white' }}>
+          {submitted ? '✓ Enviado' : '✅ Listo'}
+        </button>
+        <button onClick={handleBasta} disabled={submitted}
+          className="btn-basta flex-1 py-4 text-2xl disabled:opacity-40">
+          ¡BASTA!
+        </button>
+      </div>
+    </div>
+  );
+}

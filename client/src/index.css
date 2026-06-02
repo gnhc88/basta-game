@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #C1121F;
+  min-height: 100vh;
+  color: white;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at top, #e63946 0%, #c1121f 40%, #780000 100%);
+  z-index: -1;
+}
+
+.font-game {
+  font-family: 'Fredoka One', cursive;
+}
+
+.basta-logo {
+  font-family: 'Fredoka One', cursive;
+  color: white;
+  -webkit-text-stroke: 3px #1a1a1a;
+  text-shadow:
+    4px 4px 0 #1a1a1a,
+    0 0 30px rgba(255,210,0,0.4);
+  letter-spacing: 2px;
+}
+
+.basta-logo span {
+  color: #FFD700;
+  -webkit-text-stroke: 3px #1a1a1a;
+}
+
+.card {
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #1a1a1a;
+  font-weight: 900;
+  border-radius: 16px;
+  transition: all 0.15s;
+  box-shadow: 0 4px 15px rgba(255,165,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(1px); box-shadow: 0 2px 8px rgba(255,165,0,0.4); }
+
+.btn-basta {
+  background: linear-gradient(135deg, #ff4444, #cc0000);
+  color: white;
+  font-weight: 900;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(200,0,0,0.5), inset 0 1px 0 rgba(255,100,100,0.3);
+  transition: all 0.15s;
+}
+.btn-basta:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn-basta:active { transform: translateY(1px); }
+
+.timer-ring {
+  transition: stroke-dashoffset 1s linear;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
