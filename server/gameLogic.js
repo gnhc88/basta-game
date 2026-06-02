@@ -59,7 +59,7 @@ function pickRandomLetter(usedLetters = []) {
 function pickCategoryList(usedLists = []) {
   const listNumbers = Object.keys(CATEGORY_LISTS).map(Number);
   const available = listNumbers.filter(n => !usedLists.includes(n));
-  if (available.length === 0) return listNumbers[0];
+  if (available.length === 0) return listNumbers[Math.floor(Math.random() * listNumbers.length)];
   return available[Math.floor(Math.random() * available.length)];
 }
 

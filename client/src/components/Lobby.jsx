@@ -13,17 +13,19 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   useEffect(() => {
     if (!socket) return;
 
+    const onRoundStart = (data) => onGameStart(data);
+    const onError = ({ msg }) => setError(msg);
     socket.on('room_update', setRoom);
-    socket.on('round_start', (data) => onGameStart(data));
-    socket.on('error', ({ msg }) => setError(msg));
+    socket.on('round_start', onRoundStart);
+    socket.on('error', onError);
 
     // Request current room state in case we missed the broadcast
     socket.emit('get_room_state');
 
     return () => {
-      socket.off('room_update');
-      socket.off('round_start');
-      socket.off('error');
+      socket.off('room_update', setRoom);
+      socket.off('round_start', onRoundStart);
+      socket.off('error', onError);
     };
   }, [socket]);
 

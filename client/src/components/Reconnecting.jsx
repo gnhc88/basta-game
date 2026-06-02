@@ -20,35 +20,37 @@ export default function Reconnecting({ onReconnected, onFailed }) {
 
     socket.emit('rejoin_room', { name, roomCode });
 
-    socket.on('room_joined', ({ roomCode, playerId, isHost }) => {
+    const onRoomJoined = ({ roomCode, playerId, isHost }) => {
       clearTimeout(timeout);
       onReconnected({ roomCode, playerId, isHost });
-    });
-
-    socket.on('round_start', (rd) => {
+    };
+    const onRoundStart = (rd) => {
       clearTimeout(timeout);
       const { roomCode: rc, playerId: pid, isHost: ih } = getSession() || {};
       onReconnected({ roomCode: rc, playerId: pid, isHost: ih, roundData: rd });
-    });
-
-    socket.on('round_end', (red) => {
+    };
+    const onRoundEnd = (red) => {
       clearTimeout(timeout);
       const { roomCode: rc, playerId: pid, isHost: ih } = getSession() || {};
       onReconnected({ roomCode: rc, playerId: pid, isHost: ih, roundEndData: red });
-    });
-
-    socket.on('rejoin_failed', ({ msg }) => {
+    };
+    const onRejoinFailed = ({ msg }) => {
       clearTimeout(timeout);
       setStatus(msg);
       setTimeout(onFailed, 1500);
-    });
+    };
+
+    socket.on('room_joined', onRoomJoined);
+    socket.on('round_start', onRoundStart);
+    socket.on('round_end', onRoundEnd);
+    socket.on('rejoin_failed', onRejoinFailed);
 
     return () => {
       clearTimeout(timeout);
-      socket.off('room_joined');
-      socket.off('round_start');
-      socket.off('round_end');
-      socket.off('rejoin_failed');
+      socket.off('room_joined', onRoomJoined);
+      socket.off('round_start', onRoundStart);
+      socket.off('round_end', onRoundEnd);
+      socket.off('rejoin_failed', onRejoinFailed);
     };
   }, [socket]);
 

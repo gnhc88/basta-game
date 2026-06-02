@@ -38,16 +38,23 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('basta_called', ({ playerName }) => {
+    const onBastaCalled = ({ playerName }) => {
       setBastaMessage(`¡${playerName} llamó BASTA!`);
       setBastaCountdown(5);
-    });
-    socket.on('ai_validating', () => setAiValidating(true));
-    socket.on('round_end', (data) => {
+    };
+    const onAiValidating = () => setAiValidating(true);
+    const onRoundEndEvent = (data) => {
       clearInterval(timerRef.current);
       onRoundEnd(data);
-    });
-    return () => { socket.off('basta_called'); socket.off('ai_validating'); socket.off('round_end'); };
+    };
+    socket.on('basta_called', onBastaCalled);
+    socket.on('ai_validating', onAiValidating);
+    socket.on('round_end', onRoundEndEvent);
+    return () => {
+      socket.off('basta_called', onBastaCalled);
+      socket.off('ai_validating', onAiValidating);
+      socket.off('round_end', onRoundEndEvent);
+    };
   }, [socket]);
 
   useEffect(() => {

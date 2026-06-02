@@ -60,7 +60,10 @@ function getRoomState(room) {
 
 io.on('connection', (socket) => {
   socket.on('create_room', ({ name, maxRounds, timeLimit, isPublic }) => {
-    const room = createRoom(socket.id, name);
+    if (typeof name !== 'string' || !name.trim() || name.length > 30) return;
+    if (maxRounds && (typeof maxRounds !== 'number' || maxRounds < 1 || maxRounds > 10)) return;
+    if (timeLimit && (typeof timeLimit !== 'number' || timeLimit < 10 || timeLimit > 300)) return;
+    const room = createRoom(socket.id, name.trim());
     if (maxRounds) room.maxRounds = maxRounds;
     if (timeLimit) room.timeLimit = timeLimit;
     room.public = !!isPublic;
@@ -75,12 +78,14 @@ io.on('connection', (socket) => {
   });
 
   socket.on('join_room', ({ name, roomCode }) => {
-    const room = rooms[roomCode];
+    if (typeof name !== 'string' || !name.trim() || name.length > 30) return socket.emit('error', { msg: 'Nombre inválido' });
+    if (typeof roomCode !== 'string' || !roomCode.trim()) return socket.emit('error', { msg: 'Código inválido' });
+    const room = rooms[roomCode.trim().toUpperCase()];
     if (!room) return socket.emit('error', { msg: 'Sala no encontrada' });
     if (room.status !== 'lobby') return socket.emit('error', { msg: 'La partida ya comenzó' });
     if (room.players.length >= 8) return socket.emit('error', { msg: 'Sala llena' });
 
-    room.players.push({ id: socket.id, name, score: 0, ready: false });
+    room.players.push({ id: socket.id, name: name.trim(), score: 0, ready: false });
     playerRoom[socket.id] = roomCode;
 
     socket.join(roomCode);
@@ -185,6 +190,7 @@ io.on('connection', (socket) => {
     const roomCode = playerRoom[socket.id];
     const room = rooms[roomCode];
     if (!room || room.status !== 'playing') return;
+    if (room.calledBasta) return; // alguien ya llamó basta
 
     room.answers[socket.id] = answers;
     room.calledBasta = socket.id;
@@ -242,16 +248,14 @@ io.on('connection', (socket) => {
       challenge.resolved = true;
       const accepted = acceptVotes >= rejectVotes;
       if (!accepted) {
-        // Remove answer points — reset that answer
+        // Remove answer and recalculate — rollback then re-score
         if (room.answers[challenge.targetPlayerId]) {
           room.answers[challenge.targetPlayerId][challenge.category] = '';
         }
-        // Recalculate scores
         room.players.forEach(p => { p.score -= (room.roundScores[p.id] || 0); });
-        const newScores = scoreRound(room);
-        room.players.forEach(p => { p.score += newScores[p.id] || 0; });
+        scoreRound(room); // already applies new scores internally
       }
-      broadcast(roomCode, 'challenge_resolved', { key, accepted, players: room.players });
+      broadcast(roomCode, 'challenge_resolved', { key, accepted, players: room.players, roundScores: room.roundScores });
     }
   });
 
@@ -263,6 +267,13 @@ io.on('connection', (socket) => {
     if (room.round >= room.maxRounds) {
       room.status = 'finished';
       broadcast(roomCode, 'game_over', { players: room.players });
+      // Cleanup room after players have time to see results
+      setTimeout(() => {
+        if (rooms[roomCode]) {
+          rooms[roomCode].players.forEach(p => delete playerRoom[p.id]);
+          delete rooms[roomCode];
+        }
+      }, 60000);
     } else {
       startRound(room);
     }
@@ -289,6 +300,7 @@ io.on('connection', (socket) => {
 function startRound(room) {
   room.round += 1;
   room.status = 'playing';
+  room._ending = false;
   room.answers = {};
   room.roundScores = {};
   room.challenges = {};
@@ -321,6 +333,8 @@ function startRound(room) {
 }
 
 async function endRound(room) {
+  if (room._ending) return;
+  room._ending = true;
   if (room._timer) clearTimeout(room._timer);
   room.status = 'reviewing';
 

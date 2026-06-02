@@ -17,18 +17,21 @@ export default function Home({ onEnterGame }) {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('room_created', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true, name: nameRef.current }));
-    socket.on('room_joined', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false, name: nameRef.current }));
-    socket.on('error', ({ msg }) => setError(msg));
+    const onRoomCreated = ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true, name: nameRef.current });
+    const onRoomJoined = ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false, name: nameRef.current });
+    const onError = ({ msg }) => setError(msg);
+    socket.on('room_created', onRoomCreated);
+    socket.on('room_joined', onRoomJoined);
+    socket.on('error', onError);
     socket.on('public_rooms', setPublicRooms);
 
     socket.emit('get_public_rooms');
 
     return () => {
-      socket.off('room_created');
-      socket.off('room_joined');
-      socket.off('error');
-      socket.off('public_rooms');
+      socket.off('room_created', onRoomCreated);
+      socket.off('room_joined', onRoomJoined);
+      socket.off('error', onError);
+      socket.off('public_rooms', setPublicRooms);
     };
   }, [socket]);
 

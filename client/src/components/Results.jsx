@@ -5,7 +5,9 @@ const COLORS = ['bg-yellow-400','bg-gray-300','bg-orange-400','bg-blue-400','bg-
 
 export default function Results({ roundEndData, playerId, isHost, onNextRound, onGameOver }) {
   const { socket } = useSocket();
-  const { answers, roundScores, players, categories, letter, listNumber, isLastRound, aiValidation } = roundEndData;
+  const { answers, categories, letter, listNumber, isLastRound, aiValidation } = roundEndData;
+  const [players, setPlayers] = useState(roundEndData.players);
+  const [roundScores, setRoundScores] = useState(roundEndData.roundScores);
   const [challenges, setChallenges] = useState({});
   const [activeChallenge, setActiveChallenge] = useState(null);
 
@@ -13,25 +15,30 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('game_over', onGameOver);
-    socket.on('round_start', onNextRound);
-    socket.on('challenge_started', (data) => {
+    const onChallengeStarted = (data) => {
       setChallenges(prev => ({ ...prev, [data.key]: { ...data, votes: {} } }));
       setActiveChallenge(data.key);
-    });
-    socket.on('challenge_vote_update', ({ key, votes }) => {
+    };
+    const onVoteUpdate = ({ key, votes }) => {
       setChallenges(prev => ({ ...prev, [key]: { ...prev[key], votes } }));
-    });
-    socket.on('challenge_resolved', ({ key, accepted, players: updatedPlayers }) => {
+    };
+    const onChallengeResolved = ({ key, accepted, players: updatedPlayers, roundScores: updatedScores }) => {
       setChallenges(prev => ({ ...prev, [key]: { ...prev[key], resolved: true, accepted } }));
       setActiveChallenge(null);
-    });
+      if (updatedPlayers) setPlayers(updatedPlayers);
+      if (updatedScores) setRoundScores(updatedScores);
+    };
+    socket.on('game_over', onGameOver);
+    socket.on('round_start', onNextRound);
+    socket.on('challenge_started', onChallengeStarted);
+    socket.on('challenge_vote_update', onVoteUpdate);
+    socket.on('challenge_resolved', onChallengeResolved);
     return () => {
-      socket.off('game_over');
-      socket.off('round_start');
-      socket.off('challenge_started');
-      socket.off('challenge_vote_update');
-      socket.off('challenge_resolved');
+      socket.off('game_over', onGameOver);
+      socket.off('round_start', onNextRound);
+      socket.off('challenge_started', onChallengeStarted);
+      socket.off('challenge_vote_update', onVoteUpdate);
+      socket.off('challenge_resolved', onChallengeResolved);
     };
   }, [socket]);
 
