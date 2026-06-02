@@ -1,20 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SocketProvider } from './context/SocketContext';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
 import Results from './components/Results';
 import GameOver from './components/GameOver';
+import Reconnecting from './components/Reconnecting';
 
-// screens: home | lobby | game | results | gameover
+const SESSION_KEY = 'basta_session';
+
+export function saveSession(data) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+}
+export function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+export function getSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+}
+
+// screens: home | lobby | game | results | gameover | reconnecting
 export default function App() {
-  const [screen, setScreen] = useState('home');
-  const [gameInfo, setGameInfo] = useState(null);   // { roomCode, playerId, isHost }
+  const [screen, setScreen] = useState(() => getSession() ? 'reconnecting' : 'home');
+  const [gameInfo, setGameInfo] = useState(null);
   const [roundData, setRoundData] = useState(null);
   const [roundEndData, setRoundEndData] = useState(null);
   const [finalPlayers, setFinalPlayers] = useState(null);
 
   const handleEnterGame = (info) => {
+    saveSession({ name: info.name || '', roomCode: info.roomCode, isHost: info.isHost });
     setGameInfo(info);
     setScreen('lobby');
   };
@@ -40,6 +54,7 @@ export default function App() {
   };
 
   const handleRestart = () => {
+    clearSession();
     setScreen('home');
     setGameInfo(null);
     setRoundData(null);
@@ -47,8 +62,26 @@ export default function App() {
     setFinalPlayers(null);
   };
 
+  const handleReconnected = ({ roomCode, playerId, isHost, roundData: rd, roundEndData: red }) => {
+    setGameInfo({ roomCode, playerId, isHost });
+    if (rd) { setRoundData(rd); setScreen('game'); }
+    else if (red) { setRoundEndData(red); setScreen('results'); }
+    else setScreen('lobby');
+  };
+
+  const handleReconnectFailed = () => {
+    clearSession();
+    setScreen('home');
+  };
+
   return (
     <SocketProvider>
+      {screen === 'reconnecting' && (
+        <Reconnecting
+          onReconnected={handleReconnected}
+          onFailed={handleReconnectFailed}
+        />
+      )}
       {screen === 'home' && (
         <Home onEnterGame={handleEnterGame} />
       )}

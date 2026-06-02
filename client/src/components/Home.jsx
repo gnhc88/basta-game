@@ -14,8 +14,8 @@ export default function Home({ onEnterGame }) {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('room_created', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true }));
-    socket.on('room_joined', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false }));
+    socket.on('room_created', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true, name }));
+    socket.on('room_joined', ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false, name }));
     socket.on('error', ({ msg }) => setError(msg));
     socket.on('public_rooms', setPublicRooms);
 

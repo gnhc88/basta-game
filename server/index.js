@@ -110,6 +110,58 @@ io.on('connection', (socket) => {
     if (room) socket.emit('room_update', getRoomState(room));
   });
 
+  // Reconnect after page refresh
+  socket.on('rejoin_room', ({ name, roomCode }) => {
+    const room = rooms[roomCode];
+    if (!room) return socket.emit('rejoin_failed', { msg: 'La sala ya no existe' });
+
+    // Check if player with same name exists (replace their socket)
+    const existing = room.players.find(p => p.name === name);
+    if (existing) {
+      // Update socket ID
+      const oldId = existing.id;
+      existing.id = socket.id;
+      if (room.hostId === oldId) room.hostId = socket.id;
+      if (room.answers[oldId]) { room.answers[socket.id] = room.answers[oldId]; delete room.answers[oldId]; }
+      if (room.roundScores[oldId]) { room.roundScores[socket.id] = room.roundScores[oldId]; delete room.roundScores[oldId]; }
+      delete playerRoom[oldId];
+    } else {
+      if (room.status !== 'lobby') return socket.emit('rejoin_failed', { msg: 'La partida ya empezó' });
+      room.players.push({ id: socket.id, name, score: 0, ready: false });
+    }
+
+    playerRoom[socket.id] = roomCode;
+    socket.join(roomCode);
+
+    const isHost = room.hostId === socket.id;
+    socket.emit('room_joined', { roomCode, playerId: socket.id, isHost, rejoined: true });
+    socket.emit('room_update', getRoomState(room));
+
+    // If game is in progress, send current round state
+    if (room.status === 'playing') {
+      socket.emit('round_start', {
+        round: room.round,
+        letter: room.currentLetter,
+        categories: room.categories,
+        listNumber: room.currentListNumber,
+        timerEnd: room.timerEnd,
+        maxRounds: room.maxRounds,
+      });
+    } else if (room.status === 'reviewing') {
+      socket.emit('round_end', {
+        answers: room.answers,
+        roundScores: room.roundScores,
+        players: room.players,
+        categories: room.categories,
+        letter: room.currentLetter,
+        listNumber: room.currentListNumber,
+        isLastRound: room.round >= room.maxRounds,
+      });
+    }
+
+    broadcast(roomCode, 'room_update', getRoomState(room));
+  });
+
   socket.on('start_game', () => {
     const roomCode = playerRoom[socket.id];
     const room = rooms[roomCode];

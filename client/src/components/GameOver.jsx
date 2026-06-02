@@ -7,7 +7,10 @@ const COLORS = [
   'from-purple-400 to-purple-600',
 ];
 
+import { clearSession } from '../App';
+
 export default function GameOver({ players, onRestart }) {
+  clearSession();
   const sorted = [...players].sort((a, b) => b.score - a.score);
   const winner = sorted[0];
 
