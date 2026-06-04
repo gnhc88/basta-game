@@ -1,17 +1,17 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
-let genAI = null;
+let groq = null;
 
 function initAI() {
-  if (process.env.GEMINI_API_KEY) {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  if (process.env.GROQ_API_KEY) {
+    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   }
 }
 
 async function validateAnswers(letter, categories, answers, players) {
-  if (!genAI) return null; // fallback to manual validation if no API key
+  if (!groq) return null;
 
-  // Use numeric indices instead of socket IDs to prevent Gemini from corrupting long IDs
+  // Use numeric indices to avoid Groq corrupting long socket IDs
   const indexToId = {};
   const toValidate = [];
   players.forEach((player, idx) => {
@@ -41,21 +41,23 @@ Respuestas a validar:
 ${JSON.stringify(toValidate, null, 2)}`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0,
+    });
 
-    // Extract JSON array robustly: find first '[' and matching ']'
+    const text = completion.choices[0]?.message?.content?.trim() || '';
+
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
     if (start === -1 || end === -1 || end <= start) {
-      console.error('AI validation: no JSON array found in response:', text.substring(0, 200));
+      console.error('AI validation: no JSON array in response:', text.substring(0, 200));
       return null;
     }
 
     const validated = JSON.parse(text.slice(start, end + 1));
 
-    // Build validation map using playerIndex -> real socket ID
     const validationMap = {};
     validated.forEach(({ playerIndex, category, valid, reason }) => {
       const playerId = indexToId[playerIndex];
