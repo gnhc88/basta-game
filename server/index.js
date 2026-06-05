@@ -410,5 +410,17 @@ async function endRound(room, immediate = false) {
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 
+app.delete('/rooms/:code', (req, res) => {
+  const secret = req.headers['x-admin-secret'];
+  if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET)
+    return res.status(403).json({ error: 'forbidden' });
+  const room = rooms[req.params.code.toUpperCase()];
+  if (!room) return res.status(404).json({ error: 'not found' });
+  room.players.forEach(p => delete playerRoom[p.id]);
+  delete rooms[req.params.code.toUpperCase()];
+  broadcastPublicRooms();
+  res.json({ ok: true });
+});
+
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
