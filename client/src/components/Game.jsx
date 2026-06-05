@@ -1,6 +1,51 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 
+function HourglassTimer({ timeLeft, timeLimit, color }) {
+  const ratio = timeLimit > 0 ? Math.max(0, timeLeft) / timeLimit : 0;
+  const cx = 28, topY = 8, neckY = 38, botY = 68, hw = 22;
+
+  // Top sand: fills from neckY upward based on ratio
+  const sandTopY = topY + (neckY - topY) * (1 - ratio);
+  const sandTopHW = hw * (neckY - sandTopY) / (neckY - topY);
+
+  // Bottom sand: fills from botY upward as time passes
+  const sandBotY = botY - (botY - neckY) * (1 - ratio);
+  const sandBotHW = hw * (sandBotY - neckY) / (botY - neckY);
+
+  const topPts = ratio > 0.005
+    ? `${cx - sandTopHW},${sandTopY} ${cx + sandTopHW},${sandTopY} ${cx},${neckY}`
+    : null;
+  const botPts = ratio < 0.995 && sandBotHW > 0.1
+    ? `${cx - sandBotHW},${sandBotY} ${cx + sandBotHW},${sandBotY} ${cx + hw},${botY} ${cx - hw},${botY}`
+    : null;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <svg viewBox="0 0 56 78" width="44" height="61">
+        {/* Glass outline */}
+        <polygon points={`${cx-hw},${topY} ${cx+hw},${topY} ${cx},${neckY}`}
+          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinejoin="round"/>
+        <polygon points={`${cx},${neckY} ${cx-hw},${botY} ${cx+hw},${botY}`}
+          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinejoin="round"/>
+        {/* Top sand */}
+        {topPts && <polygon points={topPts} fill="rgba(255,255,255,0.88)"/>}
+        {/* Falling sand stream */}
+        {ratio > 0.02 && ratio < 0.98 && (
+          <line x1={cx} y1={neckY} x2={cx} y2={neckY + 4}
+            stroke="rgba(255,255,255,0.65)" strokeWidth="2" strokeLinecap="round"/>
+        )}
+        {/* Bottom sand */}
+        {botPts && <polygon points={botPts} fill="rgba(255,255,255,0.88)"/>}
+        {/* Black end caps (like the real hourglass) */}
+        <rect x="6" y="0" width={hw*2} height="8" rx="4" fill="#111" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5"/>
+        <rect x="6" y={botY} width={hw*2} height="8" rx="4" fill="#111" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5"/>
+      </svg>
+      <span className="font-game text-lg leading-none" style={{ color }}>{timeLeft}</span>
+    </div>
+  );
+}
+
 export default function Game({ roomCode, playerId, isHost, initialRoundData, onRoundEnd }) {
   const { socket } = useSocket();
   const [roundData] = useState(initialRoundData);
@@ -26,11 +71,8 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
       setTimeLeft(left);
       if (left === 0) {
         clearInterval(timerRef.current);
-        // Auto-submit answers when timer runs out
-        setSubmitted(prev => {
-          if (!prev) socket.emit('submit_answers', { answers: answersRef.current });
-          return true;
-        });
+        socket.emit('submit_answers', { answers: answersRef.current });
+        setSubmitted(true);
       }
     }, 200);
     return () => clearInterval(timerRef.current);
@@ -42,16 +84,23 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
       setBastaMessage(`¡${playerName} llamó BASTA!`);
       setBastaCountdown(5);
     };
+    const onTimeUp = () => {
+      clearInterval(timerRef.current);
+      socket.emit('submit_answers', { answers: answersRef.current });
+      setSubmitted(true);
+    };
     const onAiValidating = () => setAiValidating(true);
     const onRoundEndEvent = (data) => {
       clearInterval(timerRef.current);
       onRoundEnd(data);
     };
     socket.on('basta_called', onBastaCalled);
+    socket.on('time_up', onTimeUp);
     socket.on('ai_validating', onAiValidating);
     socket.on('round_end', onRoundEndEvent);
     return () => {
       socket.off('basta_called', onBastaCalled);
+      socket.off('time_up', onTimeUp);
       socket.off('ai_validating', onAiValidating);
       socket.off('round_end', onRoundEndEvent);
     };
@@ -59,7 +108,11 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
 
   useEffect(() => {
     if (bastaCountdown === null) return;
-    if (bastaCountdown <= 0) { setSubmitted(true); return; }
+    if (bastaCountdown <= 0) {
+      socket.emit('submit_answers', { answers: answersRef.current });
+      setSubmitted(true);
+      return;
+    }
     const t = setTimeout(() => setBastaCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [bastaCountdown]);
@@ -117,20 +170,10 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
           </div>
         </div>
 
-        {/* Timer ring */}
+        {/* Hourglass timer */}
         <div className="card px-4 py-2 flex flex-col items-center">
           <div className="text-yellow-300 text-xs font-black uppercase tracking-wider mb-1">Tiempo</div>
-          <div className="relative w-16 h-16">
-            <svg width="64" height="64" className="-rotate-90">
-              <circle cx="32" cy="32" r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
-              <circle cx="32" cy="32" r={radius} fill="none" stroke={timerColor} strokeWidth="5"
-                strokeDasharray={circumference} strokeDashoffset={dashOffset}
-                strokeLinecap="round" className="timer-ring" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center font-game text-xl" style={{ color: timerColor }}>
-              {timeLeft}
-            </span>
-          </div>
+          <HourglassTimer timeLeft={timeLeft} timeLimit={timeLimit} color={timerColor} />
         </div>
       </div>
 
@@ -192,7 +235,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
         <button onClick={handleSubmit} disabled={submitted}
           className="flex-1 py-4 rounded-2xl font-black text-lg transition active:scale-95 disabled:opacity-40"
           style={{ background: submitted ? 'rgba(255,255,255,0.1)' : 'rgba(100,200,100,0.3)', border: '2px solid rgba(100,200,100,0.5)', color: 'white' }}>
-          {submitted ? '✓ Enviado' : '✅ Listo'}
+          {submitted ? '✓ Enviado' : '✅ ¡Listo!'}
         </button>
         <button onClick={handleBasta} disabled={submitted}
           className="btn-basta flex-1 py-4 text-2xl disabled:opacity-40">

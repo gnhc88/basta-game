@@ -1,3 +1,4 @@
+import LetterDice from './LetterDice';
 const MEDALS = ['🥇','🥈','🥉'];
 const COLORS = [
   'from-yellow-400 to-orange-400',
@@ -64,7 +65,7 @@ export default function GameOver({ players, onRestart }) {
       </div>
 
       <button onClick={onRestart} className="btn-primary text-xl px-12 py-4 relative z-10">
-        🎲 Jugar de nuevo
+        <LetterDice size={22} className="inline-block mr-2 align-middle -mt-0.5" />Jugar de nuevo
       </button>
     </div>
   );

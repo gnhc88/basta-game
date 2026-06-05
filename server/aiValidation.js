@@ -26,7 +26,7 @@ async function validateAnswers(letter, categories, answers, players) {
 
   if (toValidate.length === 0) return {};
 
-  const prompt = `Eres un juez del juego Basta (Scattergories en español).
+  const prompt = `Eres un juez del juego Basta, el juego de las letras.
 La letra de esta ronda es: "${letter}"
 
 Valida cada respuesta. Una respuesta es VÁLIDA si:

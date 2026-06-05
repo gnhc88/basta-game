@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
+import LetterDice from './LetterDice';
 
 export default function Home({ onEnterGame }) {
   const { socket } = useSocket();
@@ -61,7 +62,7 @@ export default function Home({ onEnterGame }) {
         <div className="basta-logo text-[80px] leading-none mb-1">
           <span>B</span>ASTA<span>!</span>
         </div>
-        <div className="font-game text-xl text-yellow-300 tracking-widest opacity-90">Scattergories</div>
+        <div className="font-game text-xl text-yellow-300 tracking-widest opacity-90">El juego de las letras</div>
       </div>
 
       {/* Name input — always visible */}
@@ -81,7 +82,7 @@ export default function Home({ onEnterGame }) {
         {!mode && (
           <div className="space-y-3">
             <button onClick={() => setMode('create')} className="btn-primary w-full text-xl py-4">
-              🎲 Crear partida
+              <LetterDice size={22} className="inline-block mr-2 align-middle -mt-0.5" />Crear partida
             </button>
             <button onClick={() => setMode('join')} className="btn-basta w-full text-xl py-4">
               🔑 Unirse con código

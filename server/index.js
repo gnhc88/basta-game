@@ -178,12 +178,13 @@ io.on('connection', (socket) => {
   socket.on('submit_answers', ({ answers }) => {
     const roomCode = playerRoom[socket.id];
     const room = rooms[roomCode];
-    if (!room || room.status !== 'playing') return;
+    // Accept answers until scoring starts (covers late submissions from slow clients)
+    if (!room || room._scoring) return;
 
     room.answers[socket.id] = answers;
 
     const allSubmitted = room.players.every(p => room.answers[p.id]);
-    if (allSubmitted) endRound(room);
+    if (allSubmitted && !room._ending) endRound(room, true);
   });
 
   socket.on('call_basta', ({ answers }) => {
@@ -301,6 +302,7 @@ function startRound(room) {
   room.round += 1;
   room.status = 'playing';
   room._ending = false;
+  room._scoring = false;
   room.answers = {};
   room.roundScores = {};
   room.challenges = {};
@@ -328,14 +330,26 @@ function startRound(room) {
   broadcast(room.code, 'room_update', getRoomState(room));
 
   room._timer = setTimeout(() => {
-    if (rooms[room.code]?.status === 'playing') endRound(room);
+    const r = rooms[room.code];
+    if (!r || r.status !== 'playing' || r._ending) return;
+    r._ending = true;
+    broadcast(room.code, 'time_up', {});
+    // Reset flag so endRound can proceed after the 2s grace window
+    setTimeout(() => { r._ending = false; endRound(room, true); }, 2000);
   }, room.timeLimit * 1000);
 }
 
-async function endRound(room) {
+async function endRound(room, immediate = false) {
   if (room._ending) return;
   room._ending = true;
   if (room._timer) clearTimeout(room._timer);
+
+  // When triggered by the server timer (not by all players submitting),
+  // wait briefly so clients can submit their last-second answers before we lock the round.
+  if (!immediate) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
   room.status = 'reviewing';
 
   // Notify clients that AI is validating
@@ -362,6 +376,8 @@ async function endRound(room) {
     });
   }
 
+  // Lock answers — no more submissions accepted from this point
+  room._scoring = true;
   const scores = scoreRound(room);
 
   // Restore original answers for display (mark as invalid)

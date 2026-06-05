@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LetterDice from './LetterDice';
 import { useSocket } from '../context/SocketContext';
 import { getSession, clearSession } from '../App';
 
@@ -56,7 +57,7 @@ export default function Reconnecting({ onReconnected, onFailed }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <div className="text-6xl animate-spin">🎲</div>
+      <LetterDice size={72} className="animate-spin" />
       <p className="font-game text-3xl text-yellow-400">{status}</p>
       <p className="text-white/40 text-sm">Volviendo a tu partida...</p>
       <button onClick={onFailed} className="mt-4 text-white/30 hover:text-white text-sm transition">
