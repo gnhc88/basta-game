@@ -86,6 +86,7 @@ function createRoom(hostId, hostName, existingCodes = new Set()) {
     challenges: {},        // { category: { challenged: true, votes: { playerId: bool } } }
     calledBasta: null,
     timerEnd: null,
+    createdAt: Date.now(),
   };
 }
 

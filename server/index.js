@@ -408,7 +408,19 @@ async function endRound(room, immediate = false) {
   broadcast(room.code, 'room_update', getRoomState(room));
 }
 
-app.get('/health', (_, res) => res.json({ ok: true }));
+app.get('/health', (_, res) => res.json({ ok: true, rooms: Object.keys(rooms).length }));
+
+// Auto-cleanup lobby rooms inactive for more than 2 hours
+setInterval(() => {
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+  Object.values(rooms).forEach(room => {
+    if (room.status === 'lobby' && room.createdAt < cutoff) {
+      room.players.forEach(p => delete playerRoom[p.id]);
+      delete rooms[room.code];
+    }
+  });
+  broadcastPublicRooms();
+}, 10 * 60 * 1000);
 
 app.delete('/rooms/:code', (req, res) => {
   const secret = req.headers['x-admin-secret'];
