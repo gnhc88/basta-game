@@ -46,8 +46,12 @@ const CATEGORY_LISTS = {
   ],
 };
 
-function generateRoomCode() {
-  return Math.random().toString(36).substring(2, 7).toUpperCase();
+function generateRoomCode(existingCodes = new Set()) {
+  let code;
+  do {
+    code = Math.random().toString(36).substring(2, 7).toUpperCase();
+  } while (existingCodes.has(code));
+  return code;
 }
 
 function pickRandomLetter(usedLetters = []) {
@@ -63,9 +67,9 @@ function pickCategoryList(usedLists = []) {
   return available[Math.floor(Math.random() * available.length)];
 }
 
-function createRoom(hostId, hostName) {
+function createRoom(hostId, hostName, existingCodes = new Set()) {
   return {
-    code: generateRoomCode(),
+    code: generateRoomCode(existingCodes),
     hostId,
     players: [{ id: hostId, name: hostName, score: 0, ready: false }],
     status: 'lobby',
@@ -74,7 +78,7 @@ function createRoom(hostId, hostName) {
     timeLimit: 60,
     categories: [...CATEGORY_LISTS[1]],
     currentListNumber: 1,
-    usedLists: [],
+    usedLists: [1],
     currentLetter: null,
     usedLetters: [],
     answers: {},

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import LetterDice from './LetterDice';
 import { useSocket } from '../context/SocketContext';
 import { getSession, clearSession } from '../App';
@@ -6,6 +6,7 @@ import { getSession, clearSession } from '../App';
 export default function Reconnecting({ onReconnected, onFailed }) {
   const { socket } = useSocket();
   const [status, setStatus] = useState('Reconectando...');
+  const rejoinDataRef = useRef(null);
 
   useEffect(() => {
     if (!socket) return;
@@ -23,16 +24,19 @@ export default function Reconnecting({ onReconnected, onFailed }) {
 
     const onRoomJoined = ({ roomCode, playerId, isHost }) => {
       clearTimeout(timeout);
+      rejoinDataRef.current = { roomCode, playerId, isHost };
       onReconnected({ roomCode, playerId, isHost });
     };
     const onRoundStart = (rd) => {
       clearTimeout(timeout);
-      const { roomCode: rc, playerId: pid, isHost: ih } = getSession() || {};
+      const fallback = getSession() || {};
+      const { roomCode: rc, playerId: pid, isHost: ih } = rejoinDataRef.current || fallback;
       onReconnected({ roomCode: rc, playerId: pid, isHost: ih, roundData: rd });
     };
     const onRoundEnd = (red) => {
       clearTimeout(timeout);
-      const { roomCode: rc, playerId: pid, isHost: ih } = getSession() || {};
+      const fallback = getSession() || {};
+      const { roomCode: rc, playerId: pid, isHost: ih } = rejoinDataRef.current || fallback;
       onReconnected({ roomCode: rc, playerId: pid, isHost: ih, roundEndData: red });
     };
     const onRejoinFailed = ({ msg }) => {

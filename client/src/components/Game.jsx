@@ -58,6 +58,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   const [aiValidating, setAiValidating] = useState(false);
   const timerRef = useRef(null);
   const answersRef = useRef({});
+  const submittedRef = useRef(false);
 
   const { letter, categories, round, timerEnd, maxRounds, listNumber } = roundData;
 
@@ -71,8 +72,11 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
       setTimeLeft(left);
       if (left === 0) {
         clearInterval(timerRef.current);
-        socket.emit('submit_answers', { answers: answersRef.current });
-        setSubmitted(true);
+        if (!submittedRef.current) {
+          submittedRef.current = true;
+          setSubmitted(true);
+          socket.emit('submit_answers', { answers: answersRef.current });
+        }
       }
     }, 200);
     return () => clearInterval(timerRef.current);
@@ -86,8 +90,11 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
     };
     const onTimeUp = () => {
       clearInterval(timerRef.current);
-      socket.emit('submit_answers', { answers: answersRef.current });
-      setSubmitted(true);
+      if (!submittedRef.current) {
+        submittedRef.current = true;
+        setSubmitted(true);
+        socket.emit('submit_answers', { answers: answersRef.current });
+      }
     };
     const onAiValidating = () => setAiValidating(true);
     const onRoundEndEvent = (data) => {
@@ -109,8 +116,11 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   useEffect(() => {
     if (bastaCountdown === null) return;
     if (bastaCountdown <= 0) {
-      socket.emit('submit_answers', { answers: answersRef.current });
-      setSubmitted(true);
+      if (!submittedRef.current) {
+        submittedRef.current = true;
+        setSubmitted(true);
+        socket.emit('submit_answers', { answers: answersRef.current });
+      }
       return;
     }
     const t = setTimeout(() => setBastaCountdown(c => c - 1), 1000);
@@ -124,13 +134,15 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   };
 
   const handleBasta = () => {
-    if (submitted) return;
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setSubmitted(true);
     socket.emit('call_basta', { answers: answersRef.current });
   };
 
   const handleSubmit = () => {
-    if (submitted) return;
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setSubmitted(true);
     socket.emit('submit_answers', { answers: answersRef.current });
   };

@@ -63,7 +63,7 @@ io.on('connection', (socket) => {
     if (typeof name !== 'string' || !name.trim() || name.length > 30) return;
     if (maxRounds && (typeof maxRounds !== 'number' || maxRounds < 1 || maxRounds > 10)) return;
     if (timeLimit && (typeof timeLimit !== 'number' || timeLimit < 10 || timeLimit > 300)) return;
-    const room = createRoom(socket.id, name.trim());
+    const room = createRoom(socket.id, name.trim(), new Set(Object.keys(rooms)));
     if (maxRounds) room.maxRounds = maxRounds;
     if (timeLimit) room.timeLimit = timeLimit;
     room.public = !!isPublic;
@@ -199,9 +199,9 @@ io.on('connection', (socket) => {
     const caller = room.players.find(p => p.id === socket.id);
     broadcast(roomCode, 'basta_called', { playerName: caller?.name });
 
-    // Give others 5s to submit
+    // Give others 5s to submit, then end immediately (no extra grace needed)
     setTimeout(() => {
-      if (rooms[roomCode]?.status === 'playing') endRound(room);
+      if (rooms[roomCode]?.status === 'playing') endRound(room, true);
     }, 5000);
   });
 
@@ -292,6 +292,12 @@ io.on('connection', (socket) => {
     if (room.players.length === 0) { delete rooms[roomCode]; return; }
     if (room.hostId === socket.id) room.hostId = room.players[0].id;
 
+    // If round is in progress, check if all remaining players have already submitted
+    if (room.status === 'playing' && !room._ending) {
+      const allSubmitted = room.players.every(p => room.answers[p.id]);
+      if (allSubmitted) { endRound(room, true); return; }
+    }
+
     broadcast(roomCode, 'player_left', { playerId: socket.id });
     broadcast(roomCode, 'room_update', getRoomState(room));
     broadcastPublicRooms();
@@ -332,10 +338,7 @@ function startRound(room) {
   room._timer = setTimeout(() => {
     const r = rooms[room.code];
     if (!r || r.status !== 'playing' || r._ending) return;
-    r._ending = true;
-    broadcast(room.code, 'time_up', {});
-    // Reset flag so endRound can proceed after the 2s grace window
-    setTimeout(() => { r._ending = false; endRound(room, true); }, 2000);
+    endRound(room, false);
   }, room.timeLimit * 1000);
 }
 
@@ -344,9 +347,9 @@ async function endRound(room, immediate = false) {
   room._ending = true;
   if (room._timer) clearTimeout(room._timer);
 
-  // When triggered by the server timer (not by all players submitting),
-  // wait briefly so clients can submit their last-second answers before we lock the round.
   if (!immediate) {
+    // Notify clients time is up, then wait 2s for last-second submissions
+    broadcast(room.code, 'time_up', {});
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
