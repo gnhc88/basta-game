@@ -62,7 +62,7 @@ export default function Home({ onEnterGame }) {
         <div className="basta-logo text-[80px] leading-none mb-1">
           <span>B</span>ASTA<span>!</span>
         </div>
-        <div className="font-game text-xl text-yellow-300 tracking-widest opacity-90">El juego de las letras ✨</div>
+        <div className="font-game text-xl text-yellow-300 tracking-widest opacity-90">El juego de las letras</div>
       </div>
 
       {/* Name input — always visible */}
