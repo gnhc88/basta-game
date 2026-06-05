@@ -13,26 +13,39 @@ async function validateAnswers(letter, categories, answers, players) {
 
   // Use numeric indices to avoid Groq corrupting long socket IDs
   const indexToId = {};
+  const letterRejected = {};   // answers that fail the letter check — skip AI
   const toValidate = [];
   players.forEach((player, idx) => {
     indexToId[idx] = player.id;
     categories.forEach(category => {
       const answer = (answers[player.id]?.[category] || '').trim();
-      if (answer) {
+      if (!answer) return;
+      // Strip leading articles before letter check
+      const stripped = answer.replace(/^(el|la|los|las|un|una|unos|unas)\s+/i, '');
+      if (stripped.charAt(0).toUpperCase() !== letter) {
+        if (!letterRejected[player.id]) letterRejected[player.id] = {};
+        letterRejected[player.id][category] = { valid: false, reason: `No comienza con ${letter}` };
+      } else {
         toValidate.push({ playerIndex: idx, category, answer });
       }
     });
   });
 
-  if (toValidate.length === 0) return {};
+  if (toValidate.length === 0) {
+    // Merge letter rejections into an empty AI result
+    return Object.keys(letterRejected).length ? letterRejected : {};
+  }
 
   const prompt = `Eres un juez del juego Basta, el juego de las letras.
-La letra de esta ronda es: "${letter}"
+La letra de esta ronda es: "${letter}". TODAS las respuestas a continuación YA fueron verificadas y comienzan con "${letter}".
 
-Valida cada respuesta. Una respuesta es VÁLIDA si:
-1. Empieza con la letra "${letter}" (ignora artículos como "el", "la", "un", "una")
-2. Es un ejemplo real y válido de la categoría indicada
-3. No es solo la letra suelta ni una palabra inventada o sin sentido
+Tu única tarea: verificar si cada respuesta es un ejemplo REAL y VÁLIDO de la categoría indicada.
+NO debes rechazar ninguna respuesta por razones de letra — eso ya fue validado.
+
+Una respuesta es INVÁLIDA solo si:
+- Es una palabra inventada o sin sentido
+- No corresponde a la categoría indicada
+- Es solo la letra suelta
 
 Responde ÚNICAMENTE con un JSON array sin texto adicional:
 [{"playerIndex":0,"category":"...","answer":"...","valid":true,"reason":"..."}]
@@ -64,6 +77,12 @@ ${JSON.stringify(toValidate, null, 2)}`;
       if (!playerId) return;
       if (!validationMap[playerId]) validationMap[playerId] = {};
       validationMap[playerId][category] = { valid: !!valid, reason };
+    });
+
+    // Merge letter rejections (authoritative) with AI category results
+    Object.entries(letterRejected).forEach(([pid, cats]) => {
+      if (!validationMap[pid]) validationMap[pid] = {};
+      Object.assign(validationMap[pid], cats);
     });
 
     return validationMap;
