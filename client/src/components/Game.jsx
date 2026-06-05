@@ -185,7 +185,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
         {/* Hourglass timer */}
         <div className="card px-4 py-2 flex flex-col items-center">
           <div className="text-yellow-300 text-xs font-black uppercase tracking-wider mb-1">Tiempo</div>
-          <HourglassTimer timeLeft={timeLeft} timeLimit={timeLimit} color={timerColor} />
+          <HourglassTimer timeLeft={timeLeft} timeLimit={maxTime} color={timerColor} />
         </div>
       </div>
 
