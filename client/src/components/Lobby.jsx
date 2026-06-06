@@ -81,12 +81,13 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             {room.players?.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
+              <div key={p.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${p.disconnected ? 'bg-white/5 opacity-50' : 'bg-white/10'}`}>
                 <div className={`w-8 h-8 rounded-full ${COLORS[i % COLORS.length]} flex items-center justify-center text-white font-black text-sm`}>
                   {p.name[0].toUpperCase()}
                 </div>
                 <span className="font-semibold truncate">{p.name}</span>
-                {p.id === room.hostId && (
+                {p.disconnected && <span className="ml-auto text-white/30 text-xs">desconectado</span>}
+                {!p.disconnected && p.id === room.hostId && (
                   <span className="ml-auto text-yellow-400 text-xs">★</span>
                 )}
               </div>

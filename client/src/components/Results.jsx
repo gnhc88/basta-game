@@ -108,11 +108,11 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
       <div className="card p-4 mb-4">
         <h3 className="text-yellow-300 text-xs uppercase tracking-widest font-black mb-3">Puntaje acumulado</h3>
         {sortedPlayers.map((p, i) => (
-          <div key={p.id} className={`flex items-center gap-3 py-2 px-2 rounded-xl mb-1 ${i === 0 ? 'bg-yellow-400/15 border border-yellow-400/30' : ''}`}>
+          <div key={p.id} className={`flex items-center gap-3 py-2 px-2 rounded-xl mb-1 ${i === 0 ? 'bg-yellow-400/15 border border-yellow-400/30' : ''} ${p.disconnected ? 'opacity-50' : ''}`}>
             <span className={`w-7 h-7 rounded-full ${COLORS[i % COLORS.length]} flex items-center justify-center text-gray-900 font-black text-sm shrink-0`}>
               {i + 1}
             </span>
-            <span className="font-bold flex-1 truncate">{p.name}</span>
+            <span className="font-bold flex-1 truncate">{p.name}{p.disconnected && <span className="text-white/30 text-xs ml-1">desconectado</span>}</span>
             {roundScores[p.id] > 0 && (
               <span className="text-green-400 text-sm font-bold">+{roundScores[p.id]}</span>
             )}

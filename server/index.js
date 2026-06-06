@@ -123,9 +123,10 @@ io.on('connection', (socket) => {
     // Check if player with same name exists (replace their socket)
     const existing = room.players.find(p => p.name === name);
     if (existing) {
-      // Update socket ID
+      // Update socket ID and clear disconnected flag
       const oldId = existing.id;
       existing.id = socket.id;
+      existing.disconnected = false;
       if (room.hostId === oldId) room.hostId = socket.id;
       if (room.answers[oldId]) { room.answers[socket.id] = room.answers[oldId]; delete room.answers[oldId]; }
       if (room.roundScores[oldId]) { room.roundScores[socket.id] = room.roundScores[oldId]; delete room.roundScores[oldId]; }
@@ -183,7 +184,7 @@ io.on('connection', (socket) => {
 
     room.answers[socket.id] = answers;
 
-    const allSubmitted = room.players.every(p => room.answers[p.id]);
+    const allSubmitted = room.players.filter(p => !p.disconnected).every(p => room.answers[p.id]);
     if (allSubmitted && !room._ending) endRound(room, true);
   });
 
@@ -286,17 +287,52 @@ io.on('connection', (socket) => {
     const room = rooms[roomCode];
     if (!room) return;
 
-    room.players = room.players.filter(p => p.id !== socket.id);
     delete playerRoom[socket.id];
+
+    const player = room.players.find(p => p.id === socket.id);
+
+    // During active game: keep player in room so they can rejoin
+    if (player && room.status !== 'lobby') {
+      player.disconnected = true;
+
+      if (room.hostId === socket.id) {
+        const next = room.players.find(p => !p.disconnected);
+        if (next) room.hostId = next.id;
+      }
+
+      // Auto-remove after 2 minutes if they never reconnect
+      setTimeout(() => {
+        const r = rooms[roomCode];
+        if (!r) return;
+        const stale = r.players.find(p => p.name === player.name && p.disconnected);
+        if (stale) {
+          r.players = r.players.filter(p => p !== stale);
+          if (r.players.length === 0) { delete rooms[roomCode]; return; }
+          broadcast(roomCode, 'room_update', getRoomState(r));
+          broadcastPublicRooms();
+        }
+      }, 120000);
+
+      // If all remaining connected players submitted, end the round
+      if (room.status === 'playing' && !room._ending) {
+        const connected = room.players.filter(p => !p.disconnected);
+        if (connected.length > 0 && connected.every(p => room.answers[p.id])) {
+          endRound(room, true);
+          return;
+        }
+      }
+
+      broadcast(roomCode, 'player_left', { playerId: socket.id });
+      broadcast(roomCode, 'room_update', getRoomState(room));
+      broadcastPublicRooms();
+      return;
+    }
+
+    // Lobby: remove immediately
+    room.players = room.players.filter(p => p.id !== socket.id);
 
     if (room.players.length === 0) { delete rooms[roomCode]; return; }
     if (room.hostId === socket.id) room.hostId = room.players[0].id;
-
-    // If round is in progress, check if all remaining players have already submitted
-    if (room.status === 'playing' && !room._ending) {
-      const allSubmitted = room.players.every(p => room.answers[p.id]);
-      if (allSubmitted) { endRound(room, true); return; }
-    }
 
     broadcast(roomCode, 'player_left', { playerId: socket.id });
     broadcast(roomCode, 'room_update', getRoomState(room));
@@ -305,6 +341,8 @@ io.on('connection', (socket) => {
 });
 
 function startRound(room) {
+  // Remove players who disconnected and never came back
+  room.players = room.players.filter(p => !p.disconnected);
   room.round += 1;
   room.status = 'playing';
   room._ending = false;
