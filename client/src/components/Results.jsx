@@ -124,7 +124,7 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
       {/* Answers table */}
       <div className="card p-4 flex-1 overflow-hidden mb-4">
         <h3 className="text-yellow-300 text-xs uppercase tracking-widest font-black mb-3">Respuestas de la ronda</h3>
-        <div className="overflow-auto" style={{ maxHeight: '280px' }}>
+        <div className="overflow-auto" style={{ maxHeight: '280px', overscrollBehavior: 'contain' }}>
           <table className="w-full text-xs">
             <thead className="sticky top-0" style={{ background: 'rgba(0,0,0,0.5)' }}>
               <tr>

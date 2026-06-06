@@ -7,8 +7,15 @@ body {
   font-family: 'Nunito', sans-serif;
   background: #C1121F;
   min-height: 100vh;
+  min-height: 100dvh;
   color: white;
   overflow-x: hidden;
+  overscroll-behavior-y: none; /* prevents pull-to-refresh on mobile */
+}
+
+/* Prevents iOS Safari from zooming in when focusing inputs */
+input, textarea, select {
+  font-size: 16px;
 }
 
 body::before {
@@ -92,6 +99,12 @@ body::before {
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+
+/* Use dynamic viewport height so mobile browser chrome doesn't cut content */
+.min-h-screen {
+  min-height: 100dvh !important;
 }

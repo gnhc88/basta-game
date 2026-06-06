@@ -190,7 +190,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   );
 
   return (
-    <div className="min-h-screen flex flex-col max-w-xl mx-auto w-full px-3 py-4">
+    <div className="flex flex-col max-w-xl mx-auto w-full px-3 py-4" style={{ minHeight: '100dvh' }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4 gap-3">
         {/* Round info */}
@@ -235,22 +235,22 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
       )}
 
       {/* Answer sheet — mimics the paper block from the real game */}
-      <div className="card flex-1 overflow-hidden mb-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
-        <div className="px-4 pt-3 pb-1 border-b border-white/10">
+      <div className="card flex-1 overflow-hidden mb-3 flex flex-col" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div className="px-4 pt-3 pb-1 border-b border-white/10 shrink-0">
           <p className="text-center text-white/50 text-xs font-bold uppercase tracking-widest">
             Escribe con la letra <span className="text-yellow-300 font-black text-sm">{letter}</span>
           </p>
         </div>
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+        <div className="overflow-y-auto flex-1" style={{ overscrollBehavior: 'contain' }}>
           {categories.map((cat, i) => {
             const val = answers[cat] || '';
             const hasInput = val.trim().length > 0;
             const valid = val.trim().toUpperCase().startsWith(letter);
 
             return (
-              <div key={cat} className="flex items-center border-b border-white/10 px-3 py-2 gap-2">
+              <div key={cat} className="flex items-center border-b border-white/10 px-3 py-2.5 gap-2">
                 <span className="text-yellow-400 font-black text-sm w-5 shrink-0 text-right">{i + 1}</span>
-                <span className="text-white/80 text-sm font-semibold w-44 shrink-0 leading-tight">{cat}</span>
+                <span className="text-white/80 text-sm font-semibold w-36 shrink-0 leading-tight">{cat}</span>
                 <div className="flex-1 relative">
                   <input
                     type="text"
