@@ -200,7 +200,7 @@ io.on('connection', (socket) => {
     const caller = room.players.find(p => p.id === socket.id);
     broadcast(roomCode, 'basta_called', { playerName: caller?.name });
 
-    // Give others 5s to submit, then end immediately (no extra grace needed)
+    // Give others 5s to submit their answers
     setTimeout(() => {
       if (rooms[roomCode]?.status === 'playing') endRound(room, true);
     }, 5000);
@@ -389,6 +389,10 @@ async function endRound(room, immediate = false) {
     // Notify clients time is up, then wait 2s for last-second submissions
     broadcast(room.code, 'time_up', {});
     await new Promise(resolve => setTimeout(resolve, 2000));
+  } else {
+    // Grace period: clients emit submit_answers at the 5s mark; this window
+    // absorbs network latency so those submissions arrive before _scoring locks
+    await new Promise(resolve => setTimeout(resolve, 1500));
   }
 
   room.status = 'reviewing';
