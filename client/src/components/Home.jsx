@@ -11,6 +11,7 @@ export default function Home({ onEnterGame }) {
   const [timeLimit, setTimeLimit] = useState(60);
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState('');
+  const [joining, setJoining] = useState(false);
   const [publicRooms, setPublicRooms] = useState([]);
   const nameRef = useRef(name);
 
@@ -19,8 +20,11 @@ export default function Home({ onEnterGame }) {
   useEffect(() => {
     if (!socket) return;
     const onRoomCreated = ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: true, name: nameRef.current });
-    const onRoomJoined = ({ roomCode, playerId }) => onEnterGame({ roomCode, playerId, isHost: false, name: nameRef.current });
-    const onError = ({ msg }) => setError(msg);
+    const onRoomJoined = ({ roomCode, playerId, rejoined }) => {
+      if (rejoined) return;
+      onEnterGame({ roomCode, playerId, isHost: false, name: nameRef.current });
+    };
+    const onError = ({ msg }) => { setError(msg); setJoining(false); };
     socket.on('room_created', onRoomCreated);
     socket.on('room_joined', onRoomJoined);
     socket.on('error', onError);
@@ -37,21 +41,27 @@ export default function Home({ onEnterGame }) {
   }, [socket]);
 
   const handleCreate = () => {
+    if (joining) return;
     if (!name.trim()) return setError('Escribe tu nombre');
     setError('');
+    setJoining(true);
     socket.emit('create_room', { name: name.trim(), maxRounds, timeLimit, isPublic });
   };
 
   const handleJoin = () => {
+    if (joining) return;
     if (!name.trim()) return setError('Escribe tu nombre');
     if (!roomCode.trim()) return setError('Escribe el código de sala');
     setError('');
+    setJoining(true);
     socket.emit('join_room', { name: name.trim(), roomCode: roomCode.trim().toUpperCase() });
   };
 
   const handleJoinPublic = (code) => {
+    if (joining) return;
     if (!name.trim()) return setError('Escribe tu nombre primero');
     setError('');
+    setJoining(true);
     socket.emit('join_room', { name: name.trim(), roomCode: code });
   };
 
@@ -123,8 +133,8 @@ export default function Home({ onEnterGame }) {
               </button>
             </div>
 
-            <button onClick={handleCreate} className="btn-primary w-full text-xl py-4 mb-2">
-              ¡Crear partida!
+            <button onClick={handleCreate} disabled={joining} className="btn-primary w-full text-xl py-4 mb-2 disabled:opacity-50">
+              {joining ? 'Creando...' : '¡Crear partida!'}
             </button>
             <button onClick={() => setMode(null)} className="w-full text-white/50 hover:text-white text-sm py-2 transition font-semibold">
               ← Volver
@@ -145,8 +155,8 @@ export default function Home({ onEnterGame }) {
                 className="w-full bg-black/30 border-2 border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 text-3xl font-black text-center tracking-[0.5em] focus:outline-none focus:border-red-400 transition"
               />
             </div>
-            <button onClick={handleJoin} className="btn-basta w-full text-xl py-4 mb-2">
-              ¡Unirse!
+            <button onClick={handleJoin} disabled={joining} className="btn-basta w-full text-xl py-4 mb-2 disabled:opacity-50">
+              {joining ? 'Uniéndose...' : '¡Unirse!'}
             </button>
             <button onClick={() => setMode(null)} className="w-full text-white/50 hover:text-white text-sm py-2 transition font-semibold">
               ← Volver
@@ -190,7 +200,8 @@ export default function Home({ onEnterGame }) {
                   </div>
                   <button
                     onClick={() => handleJoinPublic(room.code)}
-                    className="btn-primary px-4 py-2 text-sm rounded-xl"
+                    disabled={joining}
+                    className="btn-primary px-4 py-2 text-sm rounded-xl disabled:opacity-50"
                   >
                     Unirse
                   </button>

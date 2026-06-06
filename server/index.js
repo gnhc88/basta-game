@@ -170,7 +170,7 @@ io.on('connection', (socket) => {
   socket.on('start_game', () => {
     const roomCode = playerRoom[socket.id];
     const room = rooms[roomCode];
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== socket.id || room.status !== 'lobby') return;
     if (room.players.length < 2) return socket.emit('error', { msg: 'Necesitas al menos 2 jugadores' });
     startRound(room);
   });
@@ -263,7 +263,7 @@ io.on('connection', (socket) => {
   socket.on('next_round', () => {
     const roomCode = playerRoom[socket.id];
     const room = rooms[roomCode];
-    if (!room || room.hostId !== socket.id) return;
+    if (!room || room.hostId !== socket.id || room.status !== 'reviewing') return;
 
     if (room.round >= room.maxRounds) {
       room.status = 'finished';

@@ -50,7 +50,12 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
     socket.emit('vote_challenge', { key, accept });
   };
 
-  const handleNext = () => socket.emit('next_round');
+  const [nextSent, setNextSent] = useState(false);
+  const handleNext = () => {
+    if (nextSent) return;
+    setNextSent(true);
+    socket.emit('next_round');
+  };
 
   return (
     <div className="min-h-screen flex flex-col px-3 py-6 max-w-2xl mx-auto w-full">
@@ -199,7 +204,7 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
       </div>
 
       {isHost ? (
-        <button onClick={handleNext} className="btn-primary w-full text-xl py-4">
+        <button onClick={handleNext} disabled={nextSent} className="btn-primary w-full text-xl py-4 disabled:opacity-50">
           {isLastRound ? '🏆 Ver ganador final' : '▶ Siguiente ronda'}
         </button>
       ) : (

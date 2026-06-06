@@ -8,6 +8,7 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   const { socket } = useSocket();
   const [room, setRoom] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -36,7 +37,9 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   };
 
   const startGame = () => {
+    if (starting) return;
     setError('');
+    setStarting(true);
     socket.emit('start_game');
   };
 
@@ -116,10 +119,10 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
         {isHost ? (
           <button
             onClick={startGame}
-            disabled={(room.players?.length || 0) < 2}
+            disabled={(room.players?.length || 0) < 2 || starting}
             className="w-full bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed text-gray-900 font-black text-xl py-4 rounded-2xl transition shadow-lg active:scale-95"
           >
-            {(room.players?.length || 0) < 2 ? 'Esperando jugadores...' : '¡Empezar juego!'}
+            {starting ? 'Iniciando...' : (room.players?.length || 0) < 2 ? 'Esperando jugadores...' : '¡Empezar juego!'}
           </button>
         ) : (
           <div className="w-full bg-white/10 rounded-2xl py-4 text-center text-white/60 font-semibold">
