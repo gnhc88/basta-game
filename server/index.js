@@ -408,7 +408,7 @@ async function endRound(room, immediate = false) {
   broadcast(room.code, 'room_update', getRoomState(room));
 }
 
-app.get('/health', (_, res) => res.json({ ok: true, rooms: Object.keys(rooms).length }));
+app.get('/health', (_, res) => res.json({ ok: true, rooms: Object.keys(rooms).length, v: 2 }));
 
 // Auto-cleanup lobby rooms inactive for more than 2 hours
 setInterval(() => {
