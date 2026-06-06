@@ -10,13 +10,13 @@ import Reconnecting from './components/Reconnecting';
 const SESSION_KEY = 'basta_session';
 
 export function saveSession(data) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
 }
 export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 export function getSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch { return null; }
 }
 
 // screens: home | lobby | game | results | gameover | reconnecting
