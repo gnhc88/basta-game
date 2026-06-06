@@ -72,6 +72,24 @@ body::before {
   transition: stroke-dashoffset 1s linear;
 }
 
+@keyframes dice-pop {
+  0%   { transform: scale(1.55) rotate(-10deg); opacity: 0.6; }
+  55%  { transform: scale(0.90) rotate(4deg);  opacity: 1; }
+  75%  { transform: scale(1.10) rotate(-2deg); }
+  100% { transform: scale(1)    rotate(0deg);  }
+}
+.animate-dice-pop {
+  animation: dice-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes letter-tick {
+  0%   { opacity: 0.4; transform: scaleY(0.7); }
+  100% { opacity: 1;   transform: scaleY(1); }
+}
+.animate-letter-tick {
+  animation: letter-tick 0.06s ease-out forwards;
+}
+
 #root {
   min-height: 100vh;
   display: flex;

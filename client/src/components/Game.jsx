@@ -46,6 +46,8 @@ function HourglassTimer({ timeLeft, timeLimit, color }) {
   );
 }
 
+const ROLL_LETTERS = 'ABCDEFGHIJLMNOPRSTV'.split('');
+
 export default function Game({ roomCode, playerId, isHost, initialRoundData, onRoundEnd }) {
   const { socket } = useSocket();
   const [roundData] = useState(initialRoundData);
@@ -56,11 +58,36 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   const [bastaMessage, setBastaMessage] = useState('');
   const [bastaCountdown, setBastaCountdown] = useState(null);
   const [aiValidating, setAiValidating] = useState(false);
+  const [displayedLetter, setDisplayedLetter] = useState(
+    () => ROLL_LETTERS[Math.floor(Math.random() * ROLL_LETTERS.length)]
+  );
+  const [rolling, setRolling] = useState(true);
+  const [tickKey, setTickKey] = useState(0);
   const timerRef = useRef(null);
   const answersRef = useRef({});
   const submittedRef = useRef(false);
 
   const { letter, categories, round, timerEnd, maxRounds, listNumber } = roundData;
+
+  // Dice roll animation: fast random letters → slow down → pop to real letter
+  useEffect(() => {
+    let cancelled = false;
+    const delays = [...Array(7).fill(60), ...Array(5).fill(110), ...Array(3).fill(190), 320];
+    let idx = 0;
+    const roll = () => {
+      if (cancelled) return;
+      if (idx < delays.length) {
+        setDisplayedLetter(ROLL_LETTERS[Math.floor(Math.random() * ROLL_LETTERS.length)]);
+        setTickKey(k => k + 1);
+        setTimeout(roll, delays[idx++]);
+      } else {
+        setDisplayedLetter(letter);
+        setRolling(false);
+      }
+    };
+    setTimeout(roll, 60);
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const total = Math.ceil((timerEnd - Date.now()) / 1000);
@@ -176,9 +203,17 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
         {/* Letter - center */}
         <div className="flex flex-col items-center">
           <div className="text-yellow-300 text-xs font-black uppercase tracking-widest mb-1">Letra</div>
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl"
-            style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)', boxShadow: '0 4px 20px rgba(255,165,0,0.5)' }}>
-            <span className="font-game text-6xl text-gray-900 leading-none">{letter}</span>
+          <div
+            key={rolling ? 'rolling' : 'final'}
+            className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl ${!rolling ? 'animate-dice-pop' : ''}`}
+            style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)', boxShadow: '0 4px 20px rgba(255,165,0,0.5)' }}
+          >
+            <span
+              key={tickKey}
+              className={`font-game text-6xl text-gray-900 leading-none ${rolling ? 'animate-letter-tick' : ''}`}
+            >
+              {displayedLetter}
+            </span>
           </div>
         </div>
 
