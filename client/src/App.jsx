@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SocketProvider } from './context/SocketContext';
+import { SocketProvider, useSocket } from './context/SocketContext';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
 import Game from './components/Game';
@@ -20,12 +20,25 @@ export function getSession() {
 }
 
 // screens: home | lobby | game | results | gameover | reconnecting
-export default function App() {
+function AppInner() {
+  const { socket } = useSocket();
   const [screen, setScreen] = useState(() => getSession() ? 'reconnecting' : 'home');
   const [gameInfo, setGameInfo] = useState(null);
   const [roundData, setRoundData] = useState(null);
   const [roundEndData, setRoundEndData] = useState(null);
   const [finalPlayers, setFinalPlayers] = useState(null);
+
+  // Auto-rejoin when socket reconnects mid-game (e.g. after network drop)
+  useEffect(() => {
+    if (!socket) return;
+    const onConnect = () => {
+      if (screen === 'home' || screen === 'reconnecting') return;
+      if (!getSession()) return;
+      setScreen('reconnecting');
+    };
+    socket.on('connect', onConnect);
+    return () => socket.off('connect', onConnect);
+  }, [socket, screen]);
 
   const handleEnterGame = (info) => {
     saveSession({ name: info.name || '', roomCode: info.roomCode, isHost: info.isHost });
@@ -75,7 +88,7 @@ export default function App() {
   };
 
   return (
-    <SocketProvider>
+    <>
       {screen === 'reconnecting' && (
         <Reconnecting
           onReconnected={handleReconnected}
@@ -114,6 +127,14 @@ export default function App() {
       {screen === 'gameover' && finalPlayers && (
         <GameOver players={finalPlayers} onRestart={handleRestart} />
       )}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <SocketProvider>
+      <AppInner />
     </SocketProvider>
   );
 }
