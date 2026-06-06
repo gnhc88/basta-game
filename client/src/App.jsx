@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SocketProvider, useSocket } from './context/SocketContext';
 import Home from './components/Home';
 import Lobby from './components/Lobby';
@@ -28,16 +28,25 @@ function AppInner() {
   const [roundEndData, setRoundEndData] = useState(null);
   const [finalPlayers, setFinalPlayers] = useState(null);
 
+  const hadDisconnectRef = useRef(false);
+
   // Auto-rejoin when socket reconnects mid-game (e.g. after network drop)
   useEffect(() => {
     if (!socket) return;
+    const onDisconnect = () => { hadDisconnectRef.current = true; };
     const onConnect = () => {
+      if (!hadDisconnectRef.current) return; // skip initial connect
+      hadDisconnectRef.current = false;
       if (screen === 'home' || screen === 'reconnecting') return;
       if (!getSession()) return;
       setScreen('reconnecting');
     };
+    socket.on('disconnect', onDisconnect);
     socket.on('connect', onConnect);
-    return () => socket.off('connect', onConnect);
+    return () => {
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect', onConnect);
+    };
   }, [socket, screen]);
 
   const handleEnterGame = (info) => {
