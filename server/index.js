@@ -183,7 +183,9 @@ io.on('connection', (socket) => {
     const room = rooms[roomCode];
     if (!room || room.hostId !== socket.id || room.status !== 'lobby') return;
     if (room.players.length < 2) return socket.emit('error', { msg: 'Necesitas al menos 2 jugadores' });
-    startRound(room);
+    room.status = 'starting';
+    broadcast(roomCode, 'game_starting', {});
+    setTimeout(() => startRound(room), 3000);
   });
 
   socket.on('submit_answers', ({ answers }) => {

@@ -12,6 +12,7 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   const [error, setError] = useState('');
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
+  const [countdown, setCountdown] = useState(null);
   const chatContainerRef = useRef(null);
 
   useEffect(() => {
@@ -20,11 +21,13 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
     const onRoundStart = (data) => onGameStart(data);
     const onError = ({ msg }) => setError(msg);
     const onChatMessage = (msg) => setMessages(prev => [...prev.slice(-99), msg]);
+    const onGameStarting = () => setCountdown(3);
 
     socket.on('room_update', setRoom);
     socket.on('round_start', onRoundStart);
     socket.on('error', onError);
     socket.on('chat_message', onChatMessage);
+    socket.on('game_starting', onGameStarting);
 
     socket.emit('get_room_state');
 
@@ -33,6 +36,7 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
       socket.off('round_start', onRoundStart);
       socket.off('error', onError);
       socket.off('chat_message', onChatMessage);
+      socket.off('game_starting', onGameStarting);
     };
   }, [socket]);
 
@@ -41,6 +45,12 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -70,6 +80,23 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+      {/* Countdown overlay */}
+      {countdown !== null && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: 'rgba(0,0,0,0.88)' }}>
+          {countdown > 0 ? (
+            <div key={countdown} className="font-game animate-dice-pop" style={{ fontSize: '14rem', lineHeight: 1, color: '#FFD700', textShadow: '0 0 60px rgba(255,200,0,0.6)' }}>
+              {countdown}
+            </div>
+          ) : (
+            <div key="go" className="font-game animate-dice-pop" style={{ fontSize: '6rem', color: '#ff4444', textShadow: '0 0 40px rgba(255,0,0,0.5)' }}>
+              ¡BASTA!
+            </div>
+          )}
+          <p className="font-game text-2xl text-white/50 mt-6">
+            {countdown > 0 ? '¡Prepárense!' : '¡Empieza la ronda!'}
+          </p>
+        </div>
+      )}
       <h1 className="font-game text-6xl text-yellow-400 mb-2 drop-shadow">BASTA!</h1>
       <p className="text-blue-200 mb-6">Sala de espera</p>
 
