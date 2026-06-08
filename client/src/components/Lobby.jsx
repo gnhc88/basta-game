@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Copy, Check, Users } from 'lucide-react';
 
@@ -10,25 +10,37 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
     if (!socket) return;
 
     const onRoundStart = (data) => onGameStart(data);
     const onError = ({ msg }) => setError(msg);
+    const onChatMessage = (msg) => setMessages(prev => [...prev.slice(-99), msg]);
+
     socket.on('room_update', setRoom);
     socket.on('round_start', onRoundStart);
     socket.on('error', onError);
+    socket.on('chat_message', onChatMessage);
 
-    // Request current room state in case we missed the broadcast
     socket.emit('get_room_state');
 
     return () => {
       socket.off('room_update', setRoom);
       socket.off('round_start', onRoundStart);
       socket.off('error', onError);
+      socket.off('chat_message', onChatMessage);
     };
   }, [socket]);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -43,6 +55,13 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
     socket.emit('start_game');
   };
 
+  const sendMessage = () => {
+    const text = chatInput.trim();
+    if (!text) return;
+    socket.emit('chat_message', { text });
+    setChatInput('');
+  };
+
   if (!room) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-white/50 text-xl animate-pulse">Conectando...</div>
@@ -52,11 +71,11 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
       <h1 className="font-game text-6xl text-yellow-400 mb-2 drop-shadow">BASTA!</h1>
-      <p className="text-blue-200 mb-8">Sala de espera</p>
+      <p className="text-blue-200 mb-6">Sala de espera</p>
 
-      <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 w-full max-w-lg shadow-2xl border border-white/20">
+      <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-6 w-full max-w-lg shadow-2xl border border-white/20">
         {/* Room code */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <p className="text-blue-200 text-sm font-bold uppercase tracking-widest mb-2">Código de sala</p>
           <div className="flex items-center justify-center gap-3">
             <span className="font-game text-5xl text-yellow-400 tracking-widest">{roomCode}</span>
@@ -72,7 +91,7 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
         </div>
 
         {/* Players list */}
-        <div className="mb-6">
+        <div className="mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Users size={16} className="text-blue-200" />
             <span className="text-blue-200 text-sm font-bold uppercase tracking-wider">
@@ -82,7 +101,7 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
           <div className="grid grid-cols-2 gap-2">
             {room.players?.map((p, i) => (
               <div key={p.id} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${p.disconnected ? 'bg-white/5 opacity-50' : 'bg-white/10'}`}>
-                <div className={`w-8 h-8 rounded-full ${COLORS[i % COLORS.length]} flex items-center justify-center text-white font-black text-sm`}>
+                <div className={`w-8 h-8 rounded-full ${COLORS[i % COLORS.length]} flex items-center justify-center text-white font-black text-sm shrink-0`}>
                   {p.name[0].toUpperCase()}
                 </div>
                 <span className="font-semibold truncate">{p.name}</span>
@@ -96,7 +115,7 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
         </div>
 
         {/* Game settings */}
-        <div className="flex gap-4 mb-6 text-center">
+        <div className="flex gap-3 mb-5 text-center">
           <div className="flex-1 bg-white/5 rounded-xl py-3">
             <p className="text-yellow-400 font-black text-2xl">{room.maxRounds}</p>
             <p className="text-white/60 text-xs uppercase tracking-wide">Rondas</p>
@@ -108,6 +127,53 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
           <div className="flex-1 bg-white/5 rounded-xl py-3">
             <p className="text-yellow-400 font-black text-2xl">{room.categories?.length}</p>
             <p className="text-white/60 text-xs uppercase tracking-wide">Categorías</p>
+          </div>
+        </div>
+
+        {/* Chat */}
+        <div className="mb-5 rounded-2xl overflow-hidden border border-white/10" style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <div
+            ref={chatContainerRef}
+            className="px-3 py-2.5 space-y-1.5 overflow-y-auto"
+            style={{ height: '130px', overscrollBehavior: 'contain' }}
+          >
+            {messages.length === 0 ? (
+              <p className="text-white/20 text-xs text-center pt-6">Saluda a tus compañeros 👋</p>
+            ) : (
+              messages.map((msg, i) => {
+                const pIdx = room.players?.findIndex(p => p.id === msg.playerId) ?? 0;
+                const color = COLORS[Math.max(0, pIdx) % COLORS.length];
+                return (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className={`w-5 h-5 rounded-full ${color} flex items-center justify-center text-white font-black text-xs shrink-0 mt-0.5`}>
+                      {msg.name[0].toUpperCase()}
+                    </div>
+                    <p className="text-xs leading-snug break-all">
+                      <span className="text-white/60 font-bold">{msg.name} </span>
+                      <span className="text-white/90">{msg.text}</span>
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <div className="border-t border-white/10 flex items-center gap-2 px-3 py-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              maxLength={100}
+              placeholder="Escribe un mensaje..."
+              className="flex-1 bg-transparent text-white text-sm placeholder-white/25 focus:outline-none"
+            />
+            <button
+              onClick={sendMessage}
+              disabled={!chatInput.trim()}
+              className="text-yellow-400 hover:text-yellow-300 disabled:opacity-30 transition font-black text-xs uppercase tracking-wide"
+            >
+              Enviar
+            </button>
           </div>
         </div>
 

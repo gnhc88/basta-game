@@ -108,6 +108,16 @@ io.on('connection', (socket) => {
     socket.emit('public_rooms', publicRooms);
   });
 
+  socket.on('chat_message', ({ text }) => {
+    const roomCode = playerRoom[socket.id];
+    const room = rooms[roomCode];
+    if (!room || room.status !== 'lobby') return;
+    if (typeof text !== 'string' || !text.trim() || text.length > 100) return;
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player) return;
+    io.to(roomCode).emit('chat_message', { playerId: socket.id, name: player.name, text: text.trim() });
+  });
+
   // Request current room state (e.g., when Lobby mounts after joining)
   socket.on('get_room_state', () => {
     const roomCode = playerRoom[socket.id];
