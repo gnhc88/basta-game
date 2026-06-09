@@ -1,47 +1,33 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
+import { playTick, playUrgentTick, playValid, playInvalid, playBastaCalled } from '../utils/sounds';
 
-function HourglassTimer({ timeLeft, timeLimit, color }) {
-  const ratio = timeLimit > 0 ? Math.max(0, timeLeft) / timeLimit : 0;
-  const cx = 28, topY = 8, neckY = 38, botY = 68, hw = 22;
-
-  // Top sand: fills from neckY upward based on ratio
-  const sandTopY = topY + (neckY - topY) * (1 - ratio);
-  const sandTopHW = hw * (neckY - sandTopY) / (neckY - topY);
-
-  // Bottom sand: fills from botY upward as time passes
-  const sandBotY = botY - (botY - neckY) * (1 - ratio);
-  const sandBotHW = hw * (sandBotY - neckY) / (botY - neckY);
-
-  const topPts = ratio > 0.005
-    ? `${cx - sandTopHW},${sandTopY} ${cx + sandTopHW},${sandTopY} ${cx},${neckY}`
-    : null;
-  const botPts = ratio < 0.995 && sandBotHW > 0.1
-    ? `${cx - sandBotHW},${sandBotY} ${cx + sandBotHW},${sandBotY} ${cx + hw},${botY} ${cx - hw},${botY}`
-    : null;
+function CircleTimer({ timeLeft, timeLimit, color }) {
+  const r = 26;
+  const circ = 2 * Math.PI * r;
+  const progress = timeLimit > 0 ? Math.max(0, timeLeft) / timeLimit : 0;
+  const dash = circ * progress;
+  const urgent = timeLeft > 0 && timeLeft <= 10;
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <svg viewBox="0 0 56 78" width="44" height="61">
-        {/* Glass outline */}
-        <polygon points={`${cx-hw},${topY} ${cx+hw},${topY} ${cx},${neckY}`}
-          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinejoin="round"/>
-        <polygon points={`${cx},${neckY} ${cx-hw},${botY} ${cx+hw},${botY}`}
-          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinejoin="round"/>
-        {/* Top sand */}
-        {topPts && <polygon points={topPts} fill="rgba(255,255,255,0.88)"/>}
-        {/* Falling sand stream */}
-        {ratio > 0.02 && ratio < 0.98 && (
-          <line x1={cx} y1={neckY} x2={cx} y2={neckY + 4}
-            stroke="rgba(255,255,255,0.65)" strokeWidth="2" strokeLinecap="round"/>
-        )}
-        {/* Bottom sand */}
-        {botPts && <polygon points={botPts} fill="rgba(255,255,255,0.88)"/>}
-        {/* Black end caps (like the real hourglass) */}
-        <rect x="6" y="0" width={hw*2} height="8" rx="4" fill="#111" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5"/>
-        <rect x="6" y={botY} width={hw*2} height="8" rx="4" fill="#111" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5"/>
+    <div
+      key={urgent ? timeLeft : 'calm'}
+      className={urgent ? 'animate-timer-beat' : ''}
+      style={{ position: 'relative', width: 64, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <svg width="64" height="64" style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+        <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+        <circle
+          cx="32" cy="32" r={r} fill="none"
+          stroke={color} strokeWidth="5"
+          strokeDasharray={`${dash} ${circ}`}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dasharray 0.9s linear, stroke 0.5s ease' }}
+        />
       </svg>
-      <span className="font-game text-lg leading-none" style={{ color }}>{timeLeft}</span>
+      <span className="font-game text-2xl" style={{ color, position: 'relative', lineHeight: 1 }}>
+        {timeLeft}
+      </span>
     </div>
   );
 }
@@ -66,10 +52,11 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   const timerRef = useRef(null);
   const answersRef = useRef({});
   const submittedRef = useRef(false);
+  const lastSoundSecRef = useRef(null);
 
   const { letter, categories, round, timerEnd, maxRounds, listNumber } = roundData;
 
-  // Dice roll animation: fast random letters → slow down → pop to real letter
+  // Dice roll animation
   useEffect(() => {
     let cancelled = false;
     const delays = [...Array(7).fill(60), ...Array(5).fill(110), ...Array(3).fill(190), 320];
@@ -97,6 +84,15 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
     timerRef.current = setInterval(() => {
       const left = Math.max(0, Math.ceil((timerEnd - Date.now()) / 1000));
       setTimeLeft(left);
+
+      if (left !== lastSoundSecRef.current && !submittedRef.current) {
+        lastSoundSecRef.current = left;
+        if (left > 0) {
+          if (left <= 10) playUrgentTick();
+          else if (left <= total / 2) playTick();
+        }
+      }
+
       if (left === 0) {
         clearInterval(timerRef.current);
         if (!submittedRef.current) {
@@ -112,6 +108,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   useEffect(() => {
     if (!socket) return;
     const onBastaCalled = ({ playerName }) => {
+      playBastaCalled();
       setBastaMessage(`¡${playerName} llamó BASTA!`);
       setBastaCountdown(5);
     };
@@ -155,9 +152,18 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
   }, [bastaCountdown]);
 
   const handleChange = (cat, value) => {
+    const prev = answersRef.current[cat] || '';
     const updated = { ...answersRef.current, [cat]: value };
     answersRef.current = updated;
     setAnswers(updated);
+
+    const wasValid = prev.trim().toUpperCase().startsWith(letter);
+    const isNowValid = value.trim().toUpperCase().startsWith(letter);
+    if (!prev.trim() && value.trim()) {
+      isNowValid ? playValid() : playInvalid();
+    } else if (prev.trim() && value.trim() && wasValid !== isNowValid) {
+      isNowValid ? playValid() : playInvalid();
+    }
   };
 
   const handleBasta = () => {
@@ -174,12 +180,8 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
     socket.emit('submit_answers', { answers: answersRef.current });
   };
 
-  // Timer ring
-  const radius = 28;
-  const circumference = 2 * Math.PI * radius;
-  const progress = maxTime > 0 ? timeLeft / maxTime : 0;
-  const dashOffset = circumference * (1 - progress);
   const timerColor = timeLeft > maxTime * 0.4 ? '#4ade80' : timeLeft > maxTime * 0.2 ? '#facc15' : '#f87171';
+  const urgent = timeLeft > 0 && timeLeft <= 10 && !submitted;
 
   if (aiValidating) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -191,6 +193,15 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
 
   return (
     <div className="flex flex-col max-w-xl mx-auto w-full px-3 py-4" style={{ minHeight: '100dvh' }}>
+      {/* Urgent screen-edge flash */}
+      {urgent && (
+        <div
+          key={timeLeft}
+          className="animate-timer-beat"
+          style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, boxShadow: 'inset 0 0 80px rgba(239,68,68,0.45)' }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4 gap-3">
         {/* Round info */}
@@ -217,10 +228,10 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
           </div>
         </div>
 
-        {/* Hourglass timer */}
-        <div className="card px-4 py-2 flex flex-col items-center">
-          <div className="text-yellow-300 text-xs font-black uppercase tracking-wider mb-1">Tiempo</div>
-          <HourglassTimer timeLeft={timeLeft} timeLimit={maxTime} color={timerColor} />
+        {/* Circle timer */}
+        <div className="card px-3 py-2 flex flex-col items-center gap-1">
+          <div className="text-yellow-300 text-xs font-black uppercase tracking-wider">Tiempo</div>
+          <CircleTimer timeLeft={timeLeft} timeLimit={maxTime} color={timerColor} />
         </div>
       </div>
 
@@ -234,7 +245,7 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
         </div>
       )}
 
-      {/* Answer sheet — mimics the paper block from the real game */}
+      {/* Answer sheet */}
       <div className="card flex-1 overflow-hidden mb-3 flex flex-col" style={{ background: 'rgba(255,255,255,0.08)' }}>
         <div className="px-4 pt-3 pb-1 border-b border-white/10 shrink-0">
           <p className="text-center text-white/50 text-xs font-bold uppercase tracking-widest">

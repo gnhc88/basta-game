@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Copy, Check, Users } from 'lucide-react';
+import { playCountdown } from '../utils/sounds';
 
 const COLORS = ['bg-red-400','bg-blue-400','bg-green-400','bg-yellow-400','bg-purple-400','bg-pink-400','bg-orange-400','bg-teal-400'];
 
@@ -47,7 +48,9 @@ export default function Lobby({ roomCode, playerId, isHost, onGameStart }) {
   }, [messages]);
 
   useEffect(() => {
-    if (countdown === null || countdown <= 0) return;
+    if (countdown === null) return;
+    playCountdown(countdown);
+    if (countdown <= 0) return;
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
