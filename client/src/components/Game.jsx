@@ -111,6 +111,12 @@ export default function Game({ roomCode, playerId, isHost, initialRoundData, onR
       playBastaCalled();
       setBastaMessage(`¡${playerName} llamó BASTA!`);
       setBastaCountdown(5);
+      // Safety net: submit current answers immediately so they arrive well within
+      // the grace period, even on slow connections. countdown=0 will re-submit
+      // with any final edits (server always takes the last submission).
+      if (!submittedRef.current) {
+        socket.emit('submit_answers', { answers: answersRef.current });
+      }
     };
     const onTimeUp = () => {
       clearInterval(timerRef.current);

@@ -203,10 +203,12 @@ io.on('connection', (socket) => {
   socket.on('call_basta', ({ answers }) => {
     const roomCode = playerRoom[socket.id];
     const room = rooms[roomCode];
-    if (!room || room.status !== 'playing') return;
-    if (room.calledBasta) return; // alguien ya llamó basta
+    if (!room || room.status !== 'playing' || room._scoring) return;
 
+    // Always save this player's answers, even if someone already called basta
     room.answers[socket.id] = answers;
+
+    if (room.calledBasta) return; // alguien ya llamó basta, pero las respuestas ya se guardaron
     room.calledBasta = socket.id;
 
     const caller = room.players.find(p => p.id === socket.id);
@@ -402,9 +404,9 @@ async function endRound(room, immediate = false) {
     broadcast(room.code, 'time_up', {});
     await new Promise(resolve => setTimeout(resolve, 2000));
   } else {
-    // Grace period: clients emit submit_answers at the 5s mark; this window
-    // absorbs network latency so those submissions arrive before _scoring locks
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Grace period: clients auto-submit when bastaCountdown hits 0 (5s after receiving
+    // basta_called). Adding 3.5s absorbs up to ~3s of round-trip latency on slow mobile.
+    await new Promise(resolve => setTimeout(resolve, 3500));
   }
 
   room.status = 'reviewing';
