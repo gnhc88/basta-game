@@ -197,7 +197,8 @@ io.on('connection', (socket) => {
     room.answers[socket.id] = answers;
 
     const allSubmitted = room.players.filter(p => !p.disconnected).every(p => room.answers[p.id]);
-    if (allSubmitted && !room._ending) endRound(room, true);
+    // All players submitted voluntarily — no grace period needed, use 500ms for AI prep
+    if (allSubmitted && !room._ending) endRound(room, true, 500);
   });
 
   socket.on('call_basta', ({ answers }) => {
@@ -253,14 +254,15 @@ io.on('connection', (socket) => {
 
     challenge.votes[socket.id] = accept;
 
-    const totalVoters = room.players.length - 1; // exclude challenged player
+    // Only connected players (excluding the challenged one) can vote
+    const totalVoters = room.players.filter(p => !p.disconnected && p.id !== challenge.targetPlayerId).length;
     const votesIn = Object.keys(challenge.votes).length;
     const acceptVotes = Object.values(challenge.votes).filter(Boolean).length;
     const rejectVotes = votesIn - acceptVotes;
 
     broadcast(roomCode, 'challenge_vote_update', { key, votes: challenge.votes });
 
-    if (votesIn >= totalVoters || rejectVotes > totalVoters / 2 || acceptVotes > totalVoters / 2) {
+    if (totalVoters === 0 || votesIn >= totalVoters || rejectVotes > totalVoters / 2 || acceptVotes > totalVoters / 2) {
       challenge.resolved = true;
       const accepted = acceptVotes >= rejectVotes;
       if (!accepted) {
@@ -331,7 +333,7 @@ io.on('connection', (socket) => {
       if (room.status === 'playing' && !room._ending) {
         const connected = room.players.filter(p => !p.disconnected);
         if (connected.length > 0 && connected.every(p => room.answers[p.id])) {
-          endRound(room, true);
+          endRound(room, true, 500);
           return;
         }
       }
@@ -394,7 +396,7 @@ function startRound(room) {
   }, room.timeLimit * 1000);
 }
 
-async function endRound(room, immediate = false) {
+async function endRound(room, immediate = false, grace = 3500) {
   if (room._ending) return;
   room._ending = true;
   if (room._timer) clearTimeout(room._timer);
@@ -404,9 +406,9 @@ async function endRound(room, immediate = false) {
     broadcast(room.code, 'time_up', {});
     await new Promise(resolve => setTimeout(resolve, 2000));
   } else {
-    // Grace period: clients auto-submit when bastaCountdown hits 0 (5s after receiving
-    // basta_called). Adding 3.5s absorbs up to ~3s of round-trip latency on slow mobile.
-    await new Promise(resolve => setTimeout(resolve, 3500));
+    // Grace period before locking answers. Default 3500ms absorbs ~3s mobile latency
+    // for BASTA scenarios. Pass 500ms when all players already submitted.
+    await new Promise(resolve => setTimeout(resolve, grace));
   }
 
   room.status = 'reviewing';

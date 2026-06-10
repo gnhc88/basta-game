@@ -98,7 +98,7 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
               <p className="text-center text-white/50">Esperando votos...</p>
             )}
             <p className="text-center text-white/30 text-xs mt-3">
-              Votos: {Object.keys(challenges[activeChallenge].votes || {}).length} / {players.length - 1}
+              Votos: {Object.keys(challenges[activeChallenge].votes || {}).length} / {players.filter(p => !p.disconnected).length - 1}
             </p>
           </div>
         </div>
@@ -172,8 +172,8 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
                             }`}>
                               {ans}
                             </span>
-                            {/* Challenge button */}
-                            {playerId !== p.id && isValid && !challenged && (
+                            {/* Challenge button — disabled while another challenge is active */}
+                            {playerId !== p.id && isValid && !challenged && !activeChallenge && (
                               <button onClick={() => handleChallenge(p.id, cat)}
                                 className="text-orange-400 hover:text-orange-300 text-xs leading-none transition"
                                 title="Retar respuesta">
@@ -204,8 +204,8 @@ export default function Results({ roundEndData, playerId, isHost, onNextRound, o
       </div>
 
       {isHost ? (
-        <button onClick={handleNext} disabled={nextSent} className="btn-primary w-full text-xl py-4 disabled:opacity-50">
-          {isLastRound ? '🏆 Ver ganador final' : '▶ Siguiente ronda'}
+        <button onClick={handleNext} disabled={nextSent || !!activeChallenge} className="btn-primary w-full text-xl py-4 disabled:opacity-50">
+          {activeChallenge ? '⚔️ Reto en curso...' : isLastRound ? '🏆 Ver ganador final' : '▶ Siguiente ronda'}
         </button>
       ) : (
         <div className="card py-4 text-center text-white/50 font-semibold">
